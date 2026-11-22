@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- The only public entry: serves the app, signs members in (Easy Auth) and forwards /api/<service>/ to the services
+       behind it (docs/adr/0002). -->
+  <PropertyGroup>
+    <ContainerRepository>kochbuch-gateway</ContainerRepository>
+    <ContainerFamily>noble-chiseled</ContainerFamily>
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Yarp.ReverseProxy" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Served as static files: the browser runs the app, the gateway only hosts it. -->
+    <ProjectReference Include="..\Koch.App\Koch.App.csproj" />
+    <ProjectReference Include="..\Koch.Gateway.Contracts\Koch.Gateway.Contracts.csproj" />
+    <ProjectReference Include="..\Koch.Media.Contracts\Koch.Media.Contracts.csproj" />
+    <ProjectReference Include="..\Koch.Telemetry\Koch.Telemetry.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,63 @@
+{
+  "recipes": [
+    {
+      "id": "6f1d1c2a-7b4e-4c55-9d2b-1e0b5a6c7d80",
+      "title": "Kartoffelsuppe",
+      "servings": 4,
+      "lines": [
+        {
+          "ingredient": "Kartoffeln",
+          "amount": {
+            "value": 500,
+            "unit": "g"
+          },
+          "note": "festkochend"
+        },
+        {
+          "ingredient": "Knoblauch",
+          "amount": {
+            "value": 1,
+            "unit": "Zehe"
+          },
+          "note": ""
+        },
+        {
+          "ingredient": "Öl",
+          "amount": {
+            "value": 2,
+            "unit": "EL"
+          },
+          "note": ""
+        },
+        {
+          "ingredient": "Salz",
+          "amount": null,
+          "note": ""
+        }
+      ],
+      "steps": [
+        "Kartoffeln schälen und würfeln.",
+        "Mit Knoblauch in Öl anschwitzen,\nmit Wasser aufgießen, 20 Minuten kochen."
+      ],
+      "notes": "Schmeckt am nächsten Tag noch besser."
+    }
+  ],
+  "ingredients": [
+    {
+      "name": "Knoblauch",
+      "aisle": "sonstiges"
+    },
+    {
+      "name": "Öl",
+      "aisle": "sonstiges"
+    },
+    {
+      "name": "Salz",
+      "aisle": "sonstiges"
+    },
+    {
+      "name": "Kartoffeln",
+      "aisle": "obst-gemuese"
+    }
+  ]
+}

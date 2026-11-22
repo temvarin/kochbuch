@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Stand-ins the tests of several projects share. Not a test project itself. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Koch.ServiceDefaults\Koch.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

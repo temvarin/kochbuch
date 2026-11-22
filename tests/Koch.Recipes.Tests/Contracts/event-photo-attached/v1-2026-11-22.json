@@ -1,0 +1,14 @@
+{
+  "id": "42",
+  "source": "/kochbuch/recipes",
+  "type": "koch.recipes.photo.attached",
+  "data": {
+    "photo": "3c9e8f10-5a1b-4c2d-8e3f-4a5b6c7d8e9f",
+    "recipe": "6f1d1c2a-7b4e-4c55-9d2b-1e0b5a6c7d80"
+  },
+  "time": "2026-11-22T18:30:00+00:00",
+  "specversion": "1.0",
+  "datacontenttype": "application/json",
+  "subject": "photos/3c9e8f10-5a1b-4c2d-8e3f-4a5b6c7d8e9f",
+  "sequence": "00000000000000000042"
+}

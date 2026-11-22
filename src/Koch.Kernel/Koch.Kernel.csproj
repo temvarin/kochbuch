@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The household's shared vocabulary and sync machinery: units and quantities, shop aisles, synced items. Depended on
+       by every domain, so it holds only what rarely changes, and the sync part as abstractions the domains implement
+       (Clean Code ch20: CCP, SDP, SAP; docs/adr/0005). No domain rules and no I/O. -->
+  <PropertyGroup>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koch.Kernel.Tests" />
+  </ItemGroup>
+
+</Project>

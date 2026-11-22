@@ -1,0 +1,11 @@
+// One trace end to end: the phone's request through the gateway, the service, the database, the outbox, Service Bus
+// and Media, in time order. Paste the operation id from failures.kql, an alert, or a log line (docs/adr/0009).
+let operation = "<operation id>";
+union
+    (AppRequests | extend Kind = "request", Detail = Url),
+    (AppDependencies | extend Kind = strcat("call ", DependencyType), Detail = Data),
+    (AppTraces | extend Kind = "log", Name = Message, Detail = tostring(Properties)),
+    (AppExceptions | extend Kind = "exception", Name = ExceptionType, Detail = OuterMessage)
+| where OperationId == operation
+| project TimeGenerated, AppRoleName, Kind, Name, DurationMs, Success, ResultCode, Detail, Id, ParentId
+| order by TimeGenerated asc

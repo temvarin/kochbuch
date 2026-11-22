@@ -1,0 +1,11 @@
+// The outbox relay in Recipes (docs/adr/0008): rounds per day, events published, and rounds that failed. A failed
+// round leaves its events in recipes.Outbox for the next one; failures every round for hours mean Service Bus or its
+// role assignment is broken. Not an alert: nothing is lost, and clean-up waits 30 days anyway.
+AppDependencies
+| where TimeGenerated > ago(7d) and AppRoleName == "kochbuch-recipes" and Name == "outbox relay"
+| summarize
+    Rounds = count(),
+    Published = sum(toint(Properties["koch.outbox.published"])),
+    Failed = countif(Success == false)
+    by Day = bin(TimeGenerated, 1d)
+| order by Day desc

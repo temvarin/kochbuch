@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What the gateway promises its two kinds of callers: the app (the sign-in answer) and the services behind it (who
+       the user is). Nothing else, so that neither side depends on things it doesn't use. -->
+  <PropertyGroup>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+</Project>

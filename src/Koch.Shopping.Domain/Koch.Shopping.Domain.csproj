@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The rules of shopping lists and their sync, as plain code: runs on the phone (Koch.App), where lists are made from
+       recipes, and in the service (Koch.Shopping), which checks them. Knows nothing of recipes: the app hands it
+       planned lines (docs/adr/0005). -->
+  <PropertyGroup>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Koch.Kernel\Koch.Kernel.csproj" />
+    <ProjectReference Include="..\Koch.Shopping.Contracts\Koch.Shopping.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koch.Shopping.Domain.Tests" />
+  </ItemGroup>
+
+</Project>

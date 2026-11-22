@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The rules of recipes and their sync, as plain code: runs on the phone (Koch.App) and in the service (Koch.Recipes),
+       so both check the same rules. No I/O; the local store reads and writes through IKeyValueStore. -->
+  <PropertyGroup>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Koch.Kernel\Koch.Kernel.csproj" />
+    <ProjectReference Include="..\Koch.Recipes.Contracts\Koch.Recipes.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koch.Recipes.Domain.Tests" />
+  </ItemGroup>
+
+</Project>

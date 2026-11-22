@@ -1,0 +1,41 @@
+{
+  "lists": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "title": "Wocheneinkauf",
+      "created": "2026-11-22T18:30:00+00:00"
+    }
+  ],
+  "items": [
+    {
+      "id": "22222222-2222-2222-2222-000000000001",
+      "listId": "11111111-1111-1111-1111-111111111111",
+      "name": "Kartoffeln",
+      "amount": {
+        "value": 500,
+        "unit": "g"
+      },
+      "aisle": "obst-gemuese",
+      "checked": false,
+      "recipe": "Kartoffelsuppe"
+    },
+    {
+      "id": "22222222-2222-2222-2222-000000000002",
+      "listId": "11111111-1111-1111-1111-111111111111",
+      "name": "Salz",
+      "amount": null,
+      "aisle": "gewuerze",
+      "checked": false,
+      "recipe": "Kartoffelsuppe"
+    },
+    {
+      "id": "22222222-2222-2222-2222-000000000003",
+      "listId": "11111111-1111-1111-1111-111111111111",
+      "name": "Milch",
+      "amount": null,
+      "aisle": "kuehlregal",
+      "checked": false,
+      "recipe": null
+    }
+  ]
+}

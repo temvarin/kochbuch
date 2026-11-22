@@ -1,0 +1,22 @@
+@* One line of a shopping list: tap to put it in the trolley, or take it out again. *@
+<button type="button" class="line shopping-line @(Line.Checked ? "done" : "")" role="checkbox" aria-checked="@(Line.Checked ? "true" : "false")" aria-label="@($"{Line.Name} {Amount}".Trim())"
+        data-testid="line" @onclick="OnToggle">
+    <span class="tick" aria-hidden="true">@(Line.Checked ? "✓" : "")</span>
+    <span class="name">
+        <b>@Line.Name</b>
+        @if (Line.Recipes.Count > 0)
+        {
+            <span class="for">für @string.Join(", ", Line.Recipes)</span>
+        }
+    </span>
+    <span class="amount" data-testid="amount">@Amount</span>
+</button>
+
+@code {
+    [Parameter, EditorRequired] public Koch.Shopping.Domain.ShoppingLine Line { get; set; } = default!;
+
+    [Parameter] public EventCallback OnToggle { get; set; }
+
+    // Still to buy; once all is in the trolley, everything that was on the list.
+    private string Amount => string.Join(" + ", (Line.Checked ? Line.Total : Line.Missing).Select(German.Quantity));
+}

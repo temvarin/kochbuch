@@ -1,0 +1,32 @@
+@* A recipe's photo from the gateway. Until Media has processed a new upload, the address answers 404: then a placeholder
+   shows, and the next visit tries again (the service worker caches only photos that arrived). *@
+@if (missing)
+{
+    <div class="@(Thumbnail ? "thumb placeholder" : "photo placeholder")" aria-label="@Alt" role="img">
+        @(Thumbnail ? "" : "Das Foto wird noch vorbereitet.")
+    </div>
+}
+else
+{
+    <img class="@(Thumbnail ? "thumb" : "photo")" src="@PhotoService.Url(Photo, Width)" alt="@Alt" loading="lazy"
+         @onerror="() => missing = true" data-testid="photo" />
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid Photo { get; set; }
+
+    /// <summary>One of Koch.Media.Contracts.PhotoPaths.Widths.</summary>
+    [Parameter, EditorRequired] public int Width { get; set; }
+
+    [Parameter] public string Alt { get; set; } = "";
+
+    [Parameter] public bool Thumbnail { get; set; }
+
+    private bool missing;
+    private Guid shown;
+
+    protected override void OnParametersSet()
+    {
+        if (shown != Photo) (missing, shown) = (false, Photo);
+    }
+}

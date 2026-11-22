@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Turning an uploaded photo into WebP renditions: pure computation over bytes, testable without Azure. -->
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Koch.Media.Contracts\Koch.Media.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- The Shopping service: owns the shopping lists and their sync. Reachable only through the gateway (docs/adr/0005). -->
+  <PropertyGroup>
+    <!-- Built as a container image without Docker: dotnet publish /t:PublishContainer (docs/deployment.md). -->
+    <ContainerRepository>kochbuch-shopping</ContainerRepository>
+    <ContainerFamily>noble-chiseled</ContainerFamily>
+    <!-- Precompiled, so that a replica started from zero answers sooner. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Koch.Shopping.Domain\Koch.Shopping.Domain.csproj" />
+    <ProjectReference Include="..\Koch.ServiceDefaults\Koch.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koch.Shopping.Tests" />
+  </ItemGroup>
+
+</Project>

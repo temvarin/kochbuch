@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Development only: the photo pipeline without Azure. Prepares the local storage emulator (Azurite) and stands in for
+       Event Grid + the Media function by processing uploads with Media's own PhotoProcessor. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Koch.Media\Koch.Media.csproj" />
+  </ItemGroup>
+
+</Project>

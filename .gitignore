@@ -1,0 +1,13 @@
+# Build output
+bin/
+obj/
+publish/
+
+# Local secrets and tools
+*.user
+.vs/
+.idea/
+received.json
+
+# Local storage emulator data
+.azurite/

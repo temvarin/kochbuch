@@ -1,0 +1,16 @@
+// What failed in the last day, by app and operation, with one trace to open in trace.kql. The alert "Requests failed"
+// points here (infra/modules/alerts.bicep). A failed request is a 5xx answer or a failed function run.
+let since = ago(1d);
+let failed =
+    AppRequests
+    | where TimeGenerated > since and Success == false
+    | summarize Count = count(), Last = max(TimeGenerated), Codes = make_set(ResultCode, 5), Example = take_any(OperationId)
+        by AppRoleName, Name;
+let thrown =
+    AppExceptions
+    | where TimeGenerated > since
+    | summarize Count = count(), Last = max(TimeGenerated), Codes = make_set(ExceptionType, 5), Example = take_any(OperationId)
+        by AppRoleName, Name = OuterMessage;
+union (failed | extend What = "failed request"), (thrown | extend What = "exception")
+| project Last, What, AppRoleName, Name, Count, Codes, Example
+| order by Last desc

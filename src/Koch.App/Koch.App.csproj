@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <!-- The app on the phones: a PWA that keeps working offline, served by Koch.Gateway. -->
+  <PropertyGroup>
+    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+    <!-- No culture data (ICU) to download: the UI is German-only and formats explicitly. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Koch.Gateway.Contracts\Koch.Gateway.Contracts.csproj" />
+    <ProjectReference Include="..\Koch.Media.Contracts\Koch.Media.Contracts.csproj" />
+    <ProjectReference Include="..\Koch.Recipes.Domain\Koch.Recipes.Domain.csproj" />
+    <ProjectReference Include="..\Koch.Shopping.Domain\Koch.Shopping.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koch.App.Tests" />
+  </ItemGroup>
+
+</Project>

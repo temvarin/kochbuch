@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Koch.Kernel" />
+    <Using Include="Koch.Kernel.Measures" />
+    <Using Include="Koch.Recipes.Domain.Catalog" />
+    <Using Include="Koch.Recipes.Domain.Cooking" />
+    <Using Include="Koch.Recipes.Domain.Sync" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Samples of what released versions wrote (Contracts/README.md). -->
+    <None Include="Contracts\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Koch.Recipes.Domain\Koch.Recipes.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

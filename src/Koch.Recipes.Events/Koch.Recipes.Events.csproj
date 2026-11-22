@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The events the Recipes service publishes, for their consumers (today Media). Apart from Koch.Recipes.Contracts, so
+       that a consumer of events doesn't depend on the sync API's shapes, nor they on it (Clean Code ch20, CRP;
+       docs/adr/0008). -->
+  <PropertyGroup>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+</Project>

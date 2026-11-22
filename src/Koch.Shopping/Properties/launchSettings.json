@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "Koch.Shopping": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:8093",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ConnectionStrings__Shopping": "Server=(localdb)\\MSSQLLocalDB;Database=Kassensturz;Integrated Security=true"
+      }
+    }
+  }
+}

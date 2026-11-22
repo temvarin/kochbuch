@@ -1,0 +1,192 @@
+@page "/rezept/neu"
+@page "/rezept/{Id:guid}/bearbeiten"
+@inject RecipeService Recipes
+@inject PhotoService Photos
+@inject NavigationManager Nav
+
+<TopBar Title="@(Id is null ? "Neues Rezept" : "Rezept bearbeiten")" Back="@(Id is { } id ? $"rezept/{id}" : "")" />
+
+@if (draft is null)
+{
+    <p class="empty">Dieses Rezept gibt es nicht (mehr). <a href="">Zu den Rezepten</a></p>
+}
+else
+{
+    <form @onsubmit="Save" class="recipe-form">
+        <label class="field">
+            <span>Name</span>
+            <input @bind="draft.Title" maxlength="@Recipe.MaxTitle" placeholder="z. B. Kartoffelsuppe" data-testid="title" />
+        </label>
+        <label class="field">
+            <span>Portionen</span>
+            <input type="number" min="1" max="@Recipe.MaxServings" @bind="draft.Servings" data-testid="servings" />
+        </label>
+
+        <div class="section"><h2>Foto</h2></div>
+        <section class="card photo-edit">
+            @if (preview is not null)
+            {
+                <img class="photo" src="@preview" alt="Vorschau des gewählten Fotos" />
+            }
+            else if (draft.Photo is { } photo)
+            {
+                <RecipePhoto Photo="photo" Width="400" Alt="Foto des Rezepts" />
+            }
+            @if (uploading)
+            {
+                <p class="muted" role="status">Wird hochgeladen …</p>
+            }
+            @if (photoError is not null)
+            {
+                <p class="error" role="alert" data-testid="photo-error">@photoError</p>
+            }
+            <label class="btn">
+                @(draft.Photo is null ? "Foto wählen" : "Anderes Foto")
+                <InputFile class="visually-hidden" accept="@PhotoService.Accept" OnChange="UploadPhoto" disabled="@uploading" data-testid="photo-input" />
+            </label>
+            @if (draft.Photo is not null && !uploading)
+            {
+                <button type="button" class="btn danger" @onclick="RemovePhoto">Foto entfernen</button>
+            }
+        </section>
+
+        <div class="section"><h2>Zutaten</h2></div>
+        <datalist id="zutaten">
+            @foreach (var name in Recipes.IngredientNames)
+            {
+                <option value="@name"></option>
+            }
+        </datalist>
+        @foreach (var (line, index) in draft.Lines.Select((l, i) => (l, i)))
+        {
+            <fieldset class="card line-edit" data-testid="line">
+                <legend class="visually-hidden">Zutat @(index + 1)</legend>
+                <div class="amount-unit">
+                    <label class="field">
+                        <span>Menge</span>
+                        <input @bind="line.Amount" inputmode="decimal" placeholder="leer = nach Geschmack" data-testid="amount" />
+                    </label>
+                    <label class="field">
+                        <span>Einheit</span>
+                        <select @bind="line.Unit" data-testid="unit">
+                            @foreach (var unit in Units.InOrder)
+                            {
+                                <option value="@unit">@unit.Code()</option>
+                            }
+                        </select>
+                    </label>
+                </div>
+                <label class="field">
+                    <span>Zutat</span>
+                    <input @bind="line.Ingredient" @bind:after="KeepEmptyLine" list="zutaten" maxlength="@RecipeLine.MaxName" data-testid="ingredient" />
+                </label>
+                <label class="field">
+                    <span>Hinweis</span>
+                    <input @bind="line.Note" maxlength="@RecipeLine.MaxNote" placeholder="z. B. festkochend" />
+                </label>
+                @if (draft.Lines.Count > 1)
+                {
+                    <button type="button" class="btn danger" @onclick="() => draft.Lines.Remove(line)">Zutat entfernen</button>
+                }
+            </fieldset>
+        }
+
+        <div class="section"><h2>Zubereitung</h2></div>
+        @foreach (var (step, index) in draft.Steps.Select((s, i) => (s, i)))
+        {
+            <label class="field">
+                <span>Schritt @(index + 1)</span>
+                <textarea rows="3" @bind="step.Text" @bind:after="KeepEmptyStep" maxlength="@Recipe.MaxStep" data-testid="step"></textarea>
+            </label>
+        }
+
+        <label class="field">
+            <span>Notizen</span>
+            <textarea rows="3" @bind="draft.Notes" maxlength="@Recipe.MaxNotes"></textarea>
+        </label>
+
+        @if (error is not null)
+        {
+            <p class="error" role="alert" data-testid="error">@error</p>
+        }
+        <button type="submit" class="btn primary" data-testid="save">Speichern</button>
+        @if (Id is { } existing)
+        {
+            @if (confirmRemove)
+            {
+                <button type="button" class="btn danger" data-testid="remove-confirm" @onclick="() => Remove(existing)">Wirklich löschen</button>
+            }
+            else
+            {
+                <button type="button" class="btn danger" data-testid="remove" @onclick="() => confirmRemove = true">Rezept löschen</button>
+            }
+        }
+    </form>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private RecipeDraft? draft;
+    private string? error, photoError, preview;
+    private bool confirmRemove, uploading;
+
+    protected override void OnParametersSet()
+    {
+        draft = Id is { } id ? (Recipes.Find(id) is { } recipe ? RecipeDraft.From(recipe) : null) : new RecipeDraft();
+        (error, photoError, preview, confirmRemove) = (null, null, null, false);
+    }
+
+    private async Task UploadPhoto(InputFileChangeEventArgs e)
+    {
+        (photoError, uploading) = (null, true);
+        try
+        {
+            var file = e.File;
+            try
+            {
+                preview = await PhotoService.PreviewAsync(file);
+            }
+            catch (Exception ex) when (ex is Microsoft.JSInterop.JSException or NotSupportedException or InvalidOperationException)
+            {
+                preview = null; // only a preview, e.g. the browser can't decode the format: the upload goes ahead without it
+            }
+            draft!.Photo = await Photos.UploadAsync(file);
+        }
+        catch (PhotoUploadException ex)
+        {
+            (photoError, preview) = (ex.Message, null);
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private void RemovePhoto() => (draft!.Photo, preview) = (null, null);
+
+    // There is always one empty line and one empty step at the end, for the next one.
+    private void KeepEmptyLine()
+    {
+        if (!draft!.Lines[^1].IsBlank) draft.Lines.Add(new());
+    }
+
+    private void KeepEmptyStep()
+    {
+        if (draft!.Steps[^1].Text.Trim().Length > 0) draft.Steps.Add(new());
+    }
+
+    private void Save()
+    {
+        var id = Id ?? Guid.NewGuid();
+        if (draft!.TryBuild(id, out error) is not { } recipe) return;
+        Recipes.Save(recipe);
+        Nav.NavigateTo($"rezept/{id}");
+    }
+
+    private void Remove(Guid id)
+    {
+        Recipes.Remove(id);
+        Nav.NavigateTo("");
+    }
+}

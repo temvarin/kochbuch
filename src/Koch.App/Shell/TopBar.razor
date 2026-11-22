@@ -1,0 +1,22 @@
+@* The page's header, rendered into the layout's top bar, and the browser tab's title. *@
+<PageTitle>@Title – Kochbuch</PageTitle>
+<SectionContent SectionName="@Section">
+    @if (Back is not null)
+    {
+        <a class="icon-btn" href="@Back" aria-label="Zurück">←</a>
+    }
+    <div class="titles"><h1>@Title</h1></div>
+    @if (Back is null)
+    {
+        <a class="icon-btn end-btn" href="konto" aria-label="Konto und Abgleich">⚙</a>
+    }
+</SectionContent>
+
+@code {
+    public const string Section = "topbar";
+
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    /// <summary>Where the back arrow leads. A main page has none, and the bar links to the account page instead.</summary>
+    [Parameter] public string? Back { get; set; }
+}

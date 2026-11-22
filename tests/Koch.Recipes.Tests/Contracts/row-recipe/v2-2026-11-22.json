@@ -1,0 +1,26 @@
+{
+  "id": "6f1d1c2a-7b4e-4c55-9d2b-1e0b5a6c7d80",
+  "title": "Kartoffelsuppe",
+  "servings": 4,
+  "lines": [
+    {
+      "ingredient": "Kartoffeln",
+      "amount": {
+        "value": 500,
+        "unit": "g"
+      },
+      "note": "festkochend"
+    },
+    {
+      "ingredient": "Salz",
+      "amount": null,
+      "note": ""
+    }
+  ],
+  "steps": [
+    "Kartoffeln schälen und würfeln.",
+    "Kochen."
+  ],
+  "notes": "Schmeckt am nächsten Tag noch besser.",
+  "photo": null
+}

@@ -1,0 +1,215 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# One run per branch at a time: a newer push cancels the run still going, so an older commit can never be deployed
+# after a newer one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  # Every deployable as <project folder>=<image name>; the gateway carries the app in its wwwroot.
+  IMAGES: Koch.Gateway=kochbuch-gateway Koch.Recipes=kochbuch-recipes Koch.Shopping=kochbuch-shopping
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    # A throwaway SQL Server for the tests of the database scripts; it exists only while this job runs.
+    services:
+      sql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Test-only-container-1
+        ports: ['1433:1433']
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Test-only-container-1 -Q 'SELECT 1'"
+          --health-interval 10s --health-retries 12
+    env:
+      KOCH_TEST_SQL: Server=localhost;User ID=sa;Password=Test-only-container-1
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      # Relinks the WebAssembly runtime without culture data (InvariantGlobalization in Koch.App.csproj).
+      - run: dotnet workload install wasm-tools
+      - run: dotnet build -c Release
+      # Playwright's own Chromium for the browser tests (tests/Koch.E2E); locally they use the installed Edge.
+      - run: pwsh tests/Koch.E2E/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+      - run: dotnet test -c Release --no-build
+        env:
+          PLAYWRIGHT_CHANNEL: ''
+      # The infrastructure compiles and passes the linter (infra/bicepconfig.json: findings are errors).
+      - run: az bicep build --file infra/main.bicep --stdout > /dev/null && az bicep lint --file infra/main.bicep
+
+  what-if:
+    name: Preview the infrastructure change
+    needs: test
+    # Pull requests from this repository only: forks get no Azure token.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # A short-lived token Azure trusts (OIDC); the deploy app registration has a federated credential for pull
+      # requests that may only read (Reader on the resource group), so a pull request can't change anything.
+      id-token: write
+    env: &azure-settings
+      KOCH_MEMBERS: ${{ secrets.KOCH_MEMBERS }}
+      KOCH_SIGNIN_CLIENT_ID: ${{ vars.KOCH_SIGNIN_CLIENT_ID }}
+      KOCH_AUTH_CREDENTIAL: ${{ vars.KOCH_AUTH_CREDENTIAL }}
+      KOCH_SIGNIN_CLIENT_SECRET: ${{ secrets.KOCH_SIGNIN_CLIENT_SECRET }}
+      KOCH_SQL_SERVER: ${{ vars.KOCH_SQL_SERVER }}
+      KOCH_SQL_DATABASE: ${{ vars.KOCH_SQL_DATABASE }}
+      KOCH_BUDGET_START: ${{ vars.KOCH_BUDGET_START }}
+      KOCH_BUDGET_EMAILS: ${{ secrets.KOCH_BUDGET_EMAILS }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      # The gateway revision that has all the traffic keeps it until the new one has passed the checks (docs/adr/0009).
+      - name: Find the live gateway revision
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt
+          app=kochbuch-gateway; group="${{ vars.AZURE_RESOURCE_GROUP }}"
+          live=$(az containerapp ingress traffic show -n "$app" -g "$group" \
+            --query "[?weight==\`100\`].revisionName | [0]" -o tsv 2>/dev/null || true)
+          # Before the first staged release the traffic follows the latest revision and names none.
+          [ -n "$live" ] || live=$(az containerapp show -n "$app" -g "$group" \
+            --query properties.latestReadyRevisionName -o tsv 2>/dev/null || true)
+          echo "KOCH_GATEWAY_STABLE_REVISION=$live" >> "$GITHUB_ENV"
+      - name: What would change
+        env:
+          KOCH_IMAGE_TAG: ${{ github.event.pull_request.base.sha }}
+          KOCH_GATEWAY_REVISION_SUFFIX: pr${{ github.event.number }}
+        run: >-
+          az deployment group what-if --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}"
+          --template-file infra/main.bicep --parameters infra/main.bicepparam
+
+  deploy:
+    name: Deploy and check
+    needs: test
+    # Pull requests are tested but never deployed: there is only one environment.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Push the images to GitHub's container registry (public packages: Azure pulls them without a password).
+      packages: write
+      # A short-lived token Azure trusts (OIDC); Azure accepts it only for pushes to main.
+      id-token: write
+    env: *azure-settings
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet workload install wasm-tools
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Built by the .NET SDK, no Dockerfile: chiseled Ubuntu base, ReadyToRun (see each service's csproj).
+      - name: Build and push the images
+        env:
+          KOCH_IMAGE_TAG: ${{ github.sha }}
+        run: |
+          for entry in $IMAGES; do
+            project="${entry%%=*}"; image="${entry#*=}"
+            dotnet publish "src/$project" -c Release -r linux-x64 -t:PublishContainer \
+              -p:ContainerRegistry=ghcr.io -p:ContainerRepository="${{ github.repository_owner }}/$image" \
+              -p:ContainerImageTags="$KOCH_IMAGE_TAG"
+          done
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      # Tables first, so a new revision never starts against an older schema. The deploy identity may only change
+      # the kochbuch schemas (db/manual/grants.sql); the scripts are idempotent.
+      - name: Apply the database scripts
+        env:
+          KOCH_DB_CONNECTION: >-
+            Server=tcp:${{ vars.KOCH_SQL_SERVER }}.database.windows.net,1433;Database=${{ vars.KOCH_SQL_DATABASE }};Authentication=Active Directory Default;Encrypt=True
+        run: dotnet run --project tools/Koch.DbDeploy -c Release -- db/recipes db/shopping
+      # The gateway revision that has all the traffic keeps it until the new one has passed the checks (docs/adr/0009).
+      - name: Find the live gateway revision
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt
+          app=kochbuch-gateway; group="${{ vars.AZURE_RESOURCE_GROUP }}"
+          live=$(az containerapp ingress traffic show -n "$app" -g "$group" \
+            --query "[?weight==\`100\`].revisionName | [0]" -o tsv 2>/dev/null || true)
+          # Before the first staged release the traffic follows the latest revision and names none.
+          [ -n "$live" ] || live=$(az containerapp show -n "$app" -g "$group" \
+            --query properties.latestReadyRevisionName -o tsv 2>/dev/null || true)
+          echo "KOCH_GATEWAY_STABLE_REVISION=$live" >> "$GITHUB_ENV"
+      # The services behind the gateway are replaced at once (internal, covered by the tests); the gateway, which serves
+      # the app and holds the sign-in, gets a new revision next to the live one, without traffic.
+      - name: Deploy the infrastructure and the new images
+        id: deploy
+        env:
+          KOCH_IMAGE_TAG: ${{ github.sha }}
+          KOCH_GATEWAY_REVISION_SUFFIX: r${{ github.run_number }}-${{ github.run_attempt }}
+        run: |
+          outputs=$(az deployment group create --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "kochbuch-${{ github.run_number }}" \
+            --template-file infra/main.bicep --parameters infra/main.bicepparam \
+            --query properties.outputs --output json)
+          echo "url=https://$(jq -r .gatewayFqdn.value <<< "$outputs")" >> "$GITHUB_OUTPUT"
+          echo "media=$(jq -r .mediaFunctionName.value <<< "$outputs")" >> "$GITHUB_OUTPUT"
+          echo "candidate=$(jq -r .gatewayCandidateUrl.value <<< "$outputs")" >> "$GITHUB_OUTPUT"
+          echo "revision=$(jq -r .gatewayRevision.value <<< "$outputs")" >> "$GITHUB_OUTPUT"
+      # Media is a Function, not a container: its code goes to the Flex Consumption app as a package, after the
+      # infrastructure that created the app (docs/adr/0006).
+      - name: Package the Media function
+        run: dotnet publish src/Koch.Media -c Release -r linux-x64 --self-contained false -o media
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ steps.deploy.outputs.media }}
+          package: media
+          sku: flexconsumption
+      # The new gateway revision, at its own address while the old one still has the traffic: it answers (after a cold
+      # start from zero replicas), shows the start page, and the API wants a sign-in, also on the path that leads to a
+      # service. If not, the job stops here and nobody ever reaches the new revision (Newman ch10 p.337, smoke tests).
+      - name: Check the new revision
+        env:
+          URL: ${{ steps.deploy.outputs.candidate }}
+        run: |
+          for attempt in $(seq 1 18); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/healthz")" = 200 ] && break
+            sleep 10
+          done
+          [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/healthz")" = 200 ]
+          curl -fsS "$URL/" | grep -q '<title>Kochbuch'
+          [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/api/whoami")" = 401 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/api/recipes/status")" = 401 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/api/shopping/sync")" = 401 ]
+      # All traffic to the new revision. The old one stays active with no traffic and no replicas (free), labelled
+      # stable: rolling back is `az containerapp ingress traffic set -n kochbuch-gateway -g <group>
+      # --label-weight stable=100 next=0`. Revisions older than that are deactivated.
+      - name: Switch the traffic to the new revision
+        if: steps.deploy.outputs.candidate != steps.deploy.outputs.url
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+          NEW: ${{ steps.deploy.outputs.revision }}
+        run: |
+          app=kochbuch-gateway; group="${{ vars.AZURE_RESOURCE_GROUP }}"
+          az containerapp ingress traffic set -n "$app" -g "$group" --label-weight next=100 stable=0 --output none
+          curl -fsS "$URL/" | grep -q '<title>Kochbuch'
+          for old in $(az containerapp revision list -n "$app" -g "$group" --query \
+              "[?properties.active && name!='$NEW' && name!='$KOCH_GATEWAY_STABLE_REVISION'].name" -o tsv); do
+            az containerapp revision deactivate -n "$app" -g "$group" --revision "$old" --output none
+          done

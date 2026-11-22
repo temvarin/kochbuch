@@ -1,0 +1,14 @@
+// How long people wait, as percentiles rather than an average (DDIA ch2 p.40-42), and how many answers were errors, per
+// app and operation over the last week. The objectives (docs/adr/0009): the median sync under 300 ms, p95 under 2 s
+// even after a cold start, and no 5xx. Two users make few requests, so read the counts before the percentiles.
+AppRequests
+| where TimeGenerated > ago(7d)
+| summarize
+    Requests = count(),
+    p50 = percentile(DurationMs, 50),
+    p95 = percentile(DurationMs, 95),
+    p99 = percentile(DurationMs, 99),
+    Errors = countif(Success == false)
+    by AppRoleName, Name
+| extend ErrorRate = round(100.0 * Errors / Requests, 2)
+| order by AppRoleName asc, Requests desc

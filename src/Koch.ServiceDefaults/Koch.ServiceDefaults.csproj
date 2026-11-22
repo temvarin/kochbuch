@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Hosting plumbing every service behind the gateway needs the same way: who the caller is, the synced rows in SQL.
+       No domain code: a shared entity or rule library would couple the services' releases (docs/adr/0001). -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Data.SqlClient.Extensions.Azure" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Koch.Gateway.Contracts\Koch.Gateway.Contracts.csproj" />
+    <ProjectReference Include="..\Koch.Telemetry\Koch.Telemetry.csproj" />
+  </ItemGroup>
+
+</Project>

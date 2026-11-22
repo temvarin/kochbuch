@@ -1,0 +1,65 @@
+@page "/einkauf/{Id:guid}/rezepte"
+@inject ShoppingService Shopping
+@inject RecipeService Recipes
+@inject NavigationManager Nav
+
+<TopBar Title="Rezepte für die Liste" Back="@($"einkauf/{Id}")" />
+
+@if (Shopping.Find(Id) is null)
+{
+    <p class="empty">Diese Liste gibt es nicht (mehr). <a href="einkauf">Zu den Listen</a></p>
+}
+else if (Recipes.All.Count == 0)
+{
+    <p class="empty">Noch keine Rezepte. <a href="rezept/neu">Das erste anlegen</a></p>
+}
+else
+{
+    <p class="muted">Wähle Rezepte und für wie viele Portionen. Gleiche Zutaten werden zusammengerechnet.</p>
+    <section class="card list">
+        <ul>
+            @foreach (var recipe in Recipes.All)
+            {
+                var chosen = servings.TryGetValue(recipe.Id, out var count);
+                <li class="choice" data-testid="choice">
+                    <button type="button" class="line" role="checkbox" aria-checked="@(chosen ? "true" : "false")" aria-label="@recipe.Title"
+                            data-testid="choose" @onclick="() => Toggle(recipe)">
+                        <span class="tick" aria-hidden="true">@(chosen ? "✓" : "")</span>
+                        <span class="name"><b>@recipe.Title</b></span>
+                    </button>
+                    @if (chosen)
+                    {
+                        <div class="stepper">
+                            <button type="button" class="icon-btn" aria-label="Weniger Portionen" disabled="@(count <= 1)"
+                                    @onclick="() => servings[recipe.Id] = count - 1">−</button>
+                            <output data-testid="servings">@count</output>
+                            <button type="button" class="icon-btn" aria-label="Mehr Portionen" disabled="@(count >= Recipe.MaxServings)"
+                                    @onclick="() => servings[recipe.Id] = count + 1">+</button>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    </section>
+    <button class="btn primary" disabled="@(servings.Count == 0)" data-testid="add" @onclick="Add">
+        @(servings.Count switch { 0 => "Rezepte wählen", 1 => "1 Rezept auf die Liste", var n => $"{n} Rezepte auf die Liste" })
+    </button>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    // Chosen recipes and their servings; a recipe starts at its own number.
+    private readonly Dictionary<Guid, int> servings = [];
+
+    private void Toggle(Recipe recipe)
+    {
+        if (!servings.Remove(recipe.Id)) servings[recipe.Id] = recipe.Servings;
+    }
+
+    private void Add()
+    {
+        Shopping.Add(Id, servings.Select(s => new Choice(Recipes.Find(s.Key)!, s.Value)).Where(c => c.Recipe is not null));
+        Nav.NavigateTo($"einkauf/{Id}");
+    }
+}

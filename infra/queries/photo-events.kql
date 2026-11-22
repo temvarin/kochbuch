@@ -1,0 +1,23 @@
+// The photo clean-up (docs/adr/0008) seen from both ends: for each photo event Media applied, how long after the sync
+// request that caused it, and with what outcome. "Stale" means an event came late or twice and was rightly ignored;
+// many of them would mean Service Bus redelivers a lot. Long delays mean Recipes was asleep: the relay runs when it
+// is woken (expected, up to days).
+let since = ago(30d);
+let applied =
+    AppRequests
+    | where TimeGenerated > since and Name == "apply photo event"
+    | project Applied = TimeGenerated, OperationId,
+        Photo = tostring(Properties["koch.photo.id"]),
+        State = tostring(Properties["koch.photo.state"]),
+        Sequence = tostring(Properties["koch.event.sequence"]),
+        Outcome = tostring(Properties["koch.photo.outcome"]),
+        Succeeded = Success;
+let synced =
+    AppRequests
+    | where TimeGenerated > since and AppRoleName == "kochbuch-recipes" and Name endswith "/sync"
+    | project Synced = TimeGenerated, OperationId;
+applied
+| join kind=leftouter synced on OperationId
+| extend DelayMinutes = round((Applied - Synced) / 1m, 1)
+| project Applied, Photo, State, Sequence, Outcome, Succeeded, DelayMinutes, OperationId
+| order by Applied desc

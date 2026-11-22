@@ -1,0 +1,36 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Koch.App/Koch.App.csproj" />
+    <Project Path="src/Koch.Gateway/Koch.Gateway.csproj" />
+    <Project Path="src/Koch.Gateway.Contracts/Koch.Gateway.Contracts.csproj" />
+    <Project Path="src/Koch.Kernel/Koch.Kernel.csproj" />
+    <Project Path="src/Koch.Media/Koch.Media.csproj" />
+    <Project Path="src/Koch.Media.Contracts/Koch.Media.Contracts.csproj" />
+    <Project Path="src/Koch.Media.Imaging/Koch.Media.Imaging.csproj" />
+    <Project Path="src/Koch.Recipes.Events/Koch.Recipes.Events.csproj" />
+    <Project Path="src/Koch.Recipes/Koch.Recipes.csproj" />
+    <Project Path="src/Koch.Recipes.Contracts/Koch.Recipes.Contracts.csproj" />
+    <Project Path="src/Koch.Recipes.Domain/Koch.Recipes.Domain.csproj" />
+    <Project Path="src/Koch.ServiceDefaults/Koch.ServiceDefaults.csproj" />
+    <Project Path="src/Koch.Telemetry/Koch.Telemetry.csproj" />
+    <Project Path="src/Koch.Shopping/Koch.Shopping.csproj" />
+    <Project Path="src/Koch.Shopping.Contracts/Koch.Shopping.Contracts.csproj" />
+    <Project Path="src/Koch.Shopping.Domain/Koch.Shopping.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Koch.DbDeploy/Koch.DbDeploy.csproj" />
+    <Project Path="tools/Koch.DevPhotos/Koch.DevPhotos.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Koch.App.Tests/Koch.App.Tests.csproj" />
+    <Project Path="tests/Koch.Architecture.Tests/Koch.Architecture.Tests.csproj" />
+    <Project Path="tests/Koch.E2E/Koch.E2E.csproj" />
+    <Project Path="tests/Koch.Gateway.Tests/Koch.Gateway.Tests.csproj" />
+    <Project Path="tests/Koch.Media.Tests/Koch.Media.Tests.csproj" />
+    <Project Path="tests/Koch.Recipes.Domain.Tests/Koch.Recipes.Domain.Tests.csproj" />
+    <Project Path="tests/Koch.Recipes.Tests/Koch.Recipes.Tests.csproj" />
+    <Project Path="tests/Koch.Shopping.Domain.Tests/Koch.Shopping.Domain.Tests.csproj" />
+    <Project Path="tests/Koch.Shopping.Tests/Koch.Shopping.Tests.csproj" />
+    <Project Path="tests/Koch.Testing/Koch.Testing.csproj" />
+  </Folder>
+</Solution>

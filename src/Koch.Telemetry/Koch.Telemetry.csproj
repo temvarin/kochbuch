@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- How every HTTP app sends traces, metrics and logs: OpenTelemetry into Application Insights (docs/adr/0009). Its own
+       assembly so the gateway gets this without the services' row store (Clean Code ch20, CRP). Media, a Function, is
+       wired in its own Program.cs: the Functions worker has its own OpenTelemetry setup. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" />
+  </ItemGroup>
+
+</Project>

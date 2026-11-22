@@ -1,0 +1,24 @@
+@inherits LayoutComponentBase
+@inject Browser Browser
+@inject SyncOverview Sync
+
+<header class="topbar">
+    <SectionOutlet SectionName="@TopBar.Section" />
+</header>
+<main>
+    @Body
+</main>
+<nav class="tabbar" aria-label="Bereiche">
+    <NavLink href="" Match="NavLinkMatch.All"><span class="tab-icon" aria-hidden="true">📖</span>Rezepte</NavLink>
+    <NavLink href="einkauf"><span class="tab-icon" aria-hidden="true">🛒</span>Einkauf</NavLink>
+</nav>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _ = Browser.ProtectStorageAsync(); // the browser answers in its own time, and nothing waits for it
+        await Browser.WhenVisibleAsync(Sync.ResumeAsync);
+        await Sync.StartAsync();
+    }
+}

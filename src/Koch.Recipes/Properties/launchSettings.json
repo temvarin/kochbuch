@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "Koch.Recipes": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:8092",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ConnectionStrings__Recipes": "Server=(localdb)\\MSSQLLocalDB;Database=Kassensturz;Integrated Security=true"
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+@page "/"
+@inherits LiveComponent
+@inject RecipeService Recipes
+
+<TopBar Title="Rezepte" />
+<SyncBanner />
+
+@if (Recipes.All.Count == 0)
+{
+    <p class="empty">Noch keine Rezepte. Das erste ist schnell angelegt.</p>
+}
+else
+{
+    <label class="field">
+        <span>Suchen</span>
+        <input type="search" placeholder="Name oder Zutat" @bind="search" @bind:event="oninput" data-testid="search" />
+    </label>
+    @if (Found.Count == 0)
+    {
+        <p class="empty">Nichts gefunden.</p>
+    }
+    else
+    {
+        <section class="card list">
+            <ul>
+                @foreach (var recipe in Found)
+                {
+                    <li>
+                        <a class="line" href="rezept/@recipe.Id">
+                            @if (recipe.Photo is { } photo)
+                            {
+                                <RecipePhoto Photo="photo" Width="400" Alt="" Thumbnail="true" />
+                            }
+                            <span class="name"><b>@recipe.Title</b></span>
+                            <span class="muted">@recipe.Servings @(recipe.Servings == 1 ? "Portion" : "Portionen")</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+}
+<a class="btn primary" href="rezept/neu">Neues Rezept</a>
+
+@code {
+    private string search = "";
+
+    // In the title or any ingredient, case ignored.
+    private IReadOnlyList<Koch.Recipes.Domain.Cooking.Recipe> Found => search.Trim() is { Length: > 0 } term
+        ? [.. Recipes.All.Where(r => r.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || r.Lines.Any(l => l.Ingredient.Contains(term, StringComparison.OrdinalIgnoreCase)))]
+        : Recipes.All;
+}

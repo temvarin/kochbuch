@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What Media promises: where uploads go and where renditions appear. Media is the only writer of photos/; the gateway
+       only reads it (Newman ch4, communication through common data; docs/adr/0006). -->
+  <PropertyGroup>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,7 @@
+// What the workspace takes in per day and from which table, against the daily cap of 0.1 GB that keeps it free
+// (infra/modules/observability.bicep). Above the cap, ingestion stops until the next day: telemetry is lost, not money.
+Usage
+| where TimeGenerated > ago(30d) and IsBillable == true
+| summarize MB = round(sum(Quantity), 2) by Day = bin(TimeGenerated, 1d), DataType
+| extend CapShare = strcat(round(100.0 * MB / 102.4, 1), " %")
+| order by Day desc, MB desc

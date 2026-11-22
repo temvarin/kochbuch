@@ -1,0 +1,32 @@
+@* What keeps the recipes from reaching the other phone, if anything. Nothing while all is well. *@
+@inherits LiveComponent
+@inject AccountService Account
+@inject SyncOverview Sync
+@inject NavigationManager Nav
+
+@switch (Account.Status)
+{
+    case AccountStatus.SignedOut:
+        <button class="banner" data-testid="sign-in" @onclick="SignIn">
+            <span>Anmelden, damit eure Rezepte auf beiden Handys gleich sind</span>→
+        </button>
+        break;
+    case AccountStatus.NotMember:
+        <a class="banner" href="konto"><span>Dein Konto ist noch nicht freigeschaltet</span>→</a>
+        break;
+    case AccountStatus.SignedIn when Sync.Status == SyncStatus.Failed:
+        <a class="banner" href="konto"><span>Abgleich fehlgeschlagen – die Änderungen bleiben auf dem Handy</span>→</a>
+        break;
+    case AccountStatus.SignedIn when Sync.Status == SyncStatus.Outdated:
+        <button class="banner" @onclick="Reload"><span>Neue Version – bitte neu laden</span>↻</button>
+        break;
+    case AccountStatus.SignedIn when Sync.Status == SyncStatus.Refused:
+        <a class="banner" href="konto"><span>Der Abgleich wurde abgelehnt</span>→</a>
+        break;
+}
+
+@code {
+    private void SignIn() => Nav.NavigateTo(AccountService.SignInUrl, forceLoad: true);
+
+    private void Reload() => Nav.NavigateTo(Nav.Uri, forceLoad: true);
+}

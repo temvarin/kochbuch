@@ -1,0 +1,82 @@
+@page "/rezept/{Id:guid}"
+@inherits LiveComponent
+@inject RecipeService Recipes
+
+@if (Recipe is not { } recipe)
+{
+    <TopBar Title="Rezept" Back="" />
+    <p class="empty">Dieses Rezept gibt es nicht (mehr). <a href="">Zu den Rezepten</a></p>
+}
+else
+{
+    <TopBar Title="@recipe.Title" Back="" />
+    <SyncBanner />
+    @if (recipe.Photo is { } photo)
+    {
+        <RecipePhoto Photo="photo" Width="1200" Alt="@($"Foto: {recipe.Title}")" />
+    }
+    <section class="card">
+        <div class="setting">
+            <span>Portionen</span>
+            <div class="stepper">
+                <button class="icon-btn" aria-label="Weniger Portionen" disabled="@(Servings <= 1)" @onclick="() => servings = Servings - 1">−</button>
+                <output data-testid="servings">@Servings</output>
+                <button class="icon-btn" aria-label="Mehr Portionen" disabled="@(Servings >= Koch.Recipes.Domain.Cooking.Recipe.MaxServings)" @onclick="() => servings = Servings + 1">+</button>
+            </div>
+        </div>
+    </section>
+
+    <div class="section"><h2>Zutaten</h2></div>
+    @if (recipe.Lines.Count == 0)
+    {
+        <p class="empty">Keine Zutaten eingetragen.</p>
+    }
+    else
+    {
+        <section class="card list">
+            <ul class="ingredients" data-testid="ingredients">
+                @foreach (var line in recipe.LinesFor(Servings))
+                {
+                    <li class="ingredient">
+                        <span class="amount">@(line.Amount is { } q ? German.Quantity(q) : "")</span>
+                        <span>@line.Ingredient@(line.Note.Length > 0 ? $", {line.Note}" : "")</span>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    <div class="section"><h2>Zubereitung</h2></div>
+    @if (recipe.Steps.Count == 0)
+    {
+        <p class="empty">Keine Schritte eingetragen.</p>
+    }
+    else
+    {
+        <ol class="steps">
+            @foreach (var step in recipe.Steps)
+            {
+                <li>@step</li>
+            }
+        </ol>
+    }
+
+    @if (recipe.Notes.Length > 0)
+    {
+        <div class="section"><h2>Notizen</h2></div>
+        <p class="notes">@recipe.Notes</p>
+    }
+
+    <a class="btn" href="rezept/@recipe.Id/bearbeiten">Bearbeiten</a>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private int? servings;
+
+    private Koch.Recipes.Domain.Cooking.Recipe? Recipe => Recipes.Find(Id);
+
+    /// <summary>Starts at the recipe's own number; changing it scales every amount, without changing the recipe.</summary>
+    private int Servings => servings ?? Recipe?.Servings ?? 1;
+}

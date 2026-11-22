@@ -1,0 +1,18 @@
+{
+  "profiles": {
+    "Koch.Gateway": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:8091",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Koch__DevUser": "dev",
+        "Koch__Members": "dev",
+        "Services__recipes": "http://localhost:8092",
+        "Services__shopping": "http://localhost:8093",
+        "Photos__ConnectionString": "UseDevelopmentStorage=true",
+        "Photos__UploadOrigin": "http://127.0.0.1:10000"
+      }
+    }
+  }
+}
