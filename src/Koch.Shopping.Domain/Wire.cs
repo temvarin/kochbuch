@@ -12,38 +12,27 @@ namespace Koch.Shopping.Domain;
 /// </summary>
 public static class Wire
 {
-    public static ListJson ToJson(this ShoppingList list) => new(list.Id, list.Title, list.Created);
+    public static ItemJson ToJson(this ShoppingItem item) => new(item.Id, item.Name,
+        item.Amount is { } a ? new AmountJson(a.Amount, a.Unit.Code()) : null, item.Checked, item.Recipe);
 
-    public static ShoppingList ToDomain(this ListJson json) => new(json.Id, json.Title, json.Created);
-
-    public static ItemJson ToJson(this ShoppingItem item) => new(item.Id, item.ListId, item.Name,
-        item.Amount is { } a ? new AmountJson(a.Amount, a.Unit.Code()) : null, item.Aisle.Code(), item.Checked, item.Recipe);
-
-    public static ShoppingItem ToDomain(this ItemJson json) => new(json.Id, json.ListId, json.Name,
-        json.Amount is { } a ? new Quantity(a.Value, Units.FromCode(a.Unit)) : null, Aisles.FromCode(json.Aisle),
-        json.Checked, json.Recipe);
+    public static ShoppingItem ToDomain(this ItemJson json) => new(json.Id, json.Name,
+        json.Amount is { } a ? new Quantity(a.Value, Units.FromCode(a.Unit)) : null, json.Checked, json.Recipe);
 
     public static ShoppingSyncRequestJson ToJson(this ShoppingChanges changes) => new(ShoppingSyncRequestJson.CurrentProtocol,
-        new([.. changes.Lists.Changed.Select(ToJson)], changes.Lists.Removed),
         new([.. changes.Items.Changed.Select(ToJson)], changes.Items.Removed));
 
     /// <exception cref="ArgumentException">An item breaks a rule, or appears twice.</exception>
     public static ShoppingChanges ToDomain(this ShoppingSyncRequestJson json)
     {
-        var changes = new ShoppingChanges(
-            new([.. json.Lists.Changed.Select(ToDomain)], json.Lists.Removed),
-            new([.. json.Items.Changed.Select(ToDomain)], json.Items.Removed));
-        if (changes.Lists.Changed.DistinctBy(l => l.Id).Count() != changes.Lists.Changed.Count
-            || changes.Items.Changed.DistinctBy(i => i.Id).Count() != changes.Items.Changed.Count)
+        var changes = new ShoppingChanges(new([.. json.Items.Changed.Select(ToDomain)], json.Items.Removed));
+        if (changes.Items.Changed.DistinctBy(i => i.Id).Count() != changes.Items.Changed.Count)
             throw new ArgumentException("An item appears twice among the changes.");
         return changes;
     }
 
-    public static ShoppingSyncResponseJson ToJson(this ShoppingBook book) =>
-        new([.. book.Lists.Select(ToJson)], [.. book.Items.Select(ToJson)]);
+    public static ShoppingSyncResponseJson ToJson(this ShoppingBook book) => new([.. book.Items.Select(ToJson)]);
 
-    public static ShoppingBook ToDomain(this ShoppingSyncResponseJson json) =>
-        new(json.Lists.Select(ToDomain), json.Items.Select(ToDomain));
+    public static ShoppingBook ToDomain(this ShoppingSyncResponseJson json) => new(json.Items.Select(ToDomain));
 }
 
 /// <summary>The lists on the phone, with their sync state. See <see cref="ShoppingStore.Schema"/>.</summary>
@@ -63,8 +52,11 @@ public sealed class ShoppingStore(IKeyValueStore store)
     internal const string Key = "koch.shopping";
     internal const string UnreadableKey = "koch.shopping.unreadable";
 
-    /// <summary>1 since 2026-11-22.</summary>
-    internal const int Schema = 1;
+    /// <summary>
+    /// 1 since 2026-11-22; 2 since 2026-11-22, without aisles; 3 since 2026-11-22, one list (docs/adr/0014). Older
+    /// schemas read as they are: their aisles and lists are ignored, and every item is on the one list.
+    /// </summary>
+    internal const int Schema = 3;
 
     public SyncedShopping Load()
     {
@@ -74,9 +66,9 @@ public sealed class ShoppingStore(IKeyValueStore store)
         return new SyncedShopping();
     }
 
-    public void Save(SyncedShopping shopping) => store.Write(Key, Serialize(shopping));
+    public void Save(Synced<ShoppingBook, ShoppingChanges> shopping) => store.Write(Key, Serialize(shopping));
 
-    public static string Serialize(SyncedShopping shopping) => JsonSerializer.Serialize(
+    public static string Serialize(Synced<ShoppingBook, ShoppingChanges> shopping) => JsonSerializer.Serialize(
         new StoredShoppingJson(Schema, shopping.Book.ToJson(),
             shopping.State is { } state ? new LastShoppingSyncJson(state.LastSync, state.Base.ToJson()) : null,
             shopping.Unconfirmed?.ToJson()),
@@ -89,7 +81,7 @@ public sealed class ShoppingStore(IKeyValueStore store)
         {
             return JsonSerializer.Deserialize(json, LocalShoppingJson.Default.StoredShoppingJson) switch
             {
-                { Schema: Schema } stored => new SyncedShopping(stored.Book.ToDomain(),
+                { Schema: >= 1 and <= Schema } stored => new SyncedShopping(stored.Book.ToDomain(),
                     stored.Sync is { } sync ? new SyncState<ShoppingBook>(sync.At, sync.Base.ToDomain()) : null,
                     stored.Unconfirmed?.ToDomain()),
                 _ => null,

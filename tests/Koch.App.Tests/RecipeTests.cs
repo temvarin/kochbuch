@@ -23,12 +23,10 @@ public sealed class RecipeTests : AppTestContext
         var page = Render<RecipeEdit>();
         page.Find("[data-testid=title]").Change("Kartoffelsuppe");
         page.Find("[data-testid=servings]").Change("4");
-        page.Find("[data-testid=amount]").Change("1,5");
-        page.Find("[data-testid=unit]").Change(nameof(Unit.Kilogramm));
-        page.Find("[data-testid=ingredient]").Change("Kartoffeln");
+        page.Find("[data-testid=new-line]").Input("1,5 kg Kartoffeln");
         page.Find("[data-testid=step]").Change("Schälen und kochen.");
 
-        page.Find("form").Submit();
+        page.Find("[data-testid=save]").Click(); // the line still in the field is saved with it
         AfterSave();
 
         await WaitFor(() => !Sync.HasUnsyncedChanges && Sync.Status == SyncStatus.Ready);
@@ -46,7 +44,7 @@ public sealed class RecipeTests : AppTestContext
         var list = Render<RecipeList>();
         await Sync.StartAsync();
 
-        list.WaitForAssertion(() => Assert.Contains("Kartoffelsuppe", list.Find(".list").TextContent));
+        list.WaitForAssertion(() => Assert.Contains("Kartoffelsuppe", list.Find(".tiles").TextContent));
     }
 
     [Fact]
@@ -107,7 +105,7 @@ public sealed class RecipeTests : AppTestContext
 
         for (var i = 0; i < 4; i++) page.Find("[aria-label='Mehr Portionen']").Click();
 
-        Assert.Equal("8", page.Find("[data-testid=servings]").TextContent);
+        Assert.Equal("8 Portionen", page.Find("[data-testid=servings]").TextContent);
         var ingredients = page.Find("[data-testid=ingredients]").TextContent;
         Assert.Contains("1 kg", ingredients);
         Assert.Contains("Kartoffeln, festkochend", ingredients);
@@ -115,42 +113,81 @@ public sealed class RecipeTests : AppTestContext
     }
 
     [Fact]
+    public void Lines_typed_one_after_another_are_read_and_shown_as_they_are_read()
+    {
+        var page = Render<RecipeEdit>();
+
+        foreach (var line in new[] { "500 g Kartoffeln, festkochend", "2 Zehen Knoblauch", "Salz" })
+        {
+            page.Find("[data-testid=new-line]").Input(line);
+            page.Find("form.add-line").Submit();
+        }
+
+        Assert.Equal(["500 g Kartoffeln, festkochend", "2 Zehe Knoblauch", "– Salz"],
+            page.FindAll("[data-testid=lines] .line").Select(l => string.Join(' ', l.TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))));
+        Assert.Equal("", page.Find("[data-testid=new-line]").GetAttribute("value"));
+    }
+
+    [Fact]
     public void An_amount_the_app_cant_read_is_explained_and_nothing_is_saved()
     {
         var page = Render<RecipeEdit>();
         page.Find("[data-testid=title]").Change("Suppe");
-        page.Find("[data-testid=amount]").Change("viel");
-        page.Find("[data-testid=ingredient]").Change("Salz");
+        page.Find("[data-testid=new-line]").Input("1,2,3 g Salz");
 
-        page.Find("form").Submit();
+        page.Find("[data-testid=save]").Click();
 
-        Assert.Contains("„viel“ verstehe ich nicht", page.Find("[data-testid=error]").TextContent);
+        Assert.Contains("Menge in „1,2,3 g Salz“ verstehe ich nicht", page.Find("[data-testid=error]").TextContent);
         Assert.Empty(Recipes.All);
     }
 
     [Fact]
-    public void Editing_shows_the_exact_amounts_and_saving_unchanged_changes_nothing()
+    public void A_line_taken_back_to_change_it_keeps_its_exact_amount_and_its_place()
     {
-        var recipe = new Recipe(SoupId, "Suppe", 3, [new RecipeLine("Mehl", new Quantity(12.345m, Unit.Gramm))], []);
+        var recipe = new Recipe(SoupId, "Suppe", 3,
+            [new RecipeLine("Mehl", new Quantity(12.345m, Unit.Gramm)), new RecipeLine("Salz", null)], []);
         Recipes.Save(recipe);
         var page = Render<RecipeEdit>(parameters => parameters.Add(p => p.Id, SoupId));
-        Assert.Equal("12,345", page.Find("[data-testid=amount]").GetAttribute("value"));
 
-        page.Find("form").Submit();
+        page.FindAll("[data-testid=lines] .line")[0].Click();
+        Assert.Equal("12,345 g Mehl", page.Find("[data-testid=new-line]").GetAttribute("value"));
+        page.Find("[data-testid=save]").Click();
 
-        Assert.Equal(recipe, Recipes.Find(SoupId));
+        Assert.Equal(recipe, Recipes.Find(SoupId)); // unchanged: same amount, same order
     }
 
     [Fact]
-    public void A_removed_recipe_is_gone_from_the_list()
+    public void A_recipe_removed_from_its_menu_is_gone_after_a_confirmation()
     {
         Recipes.Save(Soup());
-        var page = Render<RecipeEdit>(parameters => parameters.Add(p => p.Id, SoupId));
+        var page = Render<RecipeView>(parameters => parameters.Add(p => p.Id, SoupId));
 
         page.Find("[data-testid=remove]").Click();
+        Assert.Single(Recipes.All);
         page.Find("[data-testid=remove-confirm]").Click();
 
         Assert.Empty(Recipes.All);
+    }
+
+    [Fact]
+    public void Cooking_shows_one_step_at_a_time_with_what_it_needs_for_the_servings_chosen()
+    {
+        Recipes.Save(new Recipe(SoupId, "Suppe", 4,
+            [new RecipeLine("Kartoffeln", new Quantity(500, Unit.Gramm)), new RecipeLine("Salz", null)],
+            ["Kartoffeln schälen.", "Mit Salz kochen."]));
+        var nav = Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        nav.NavigateTo($"rezept/{SoupId}/kochen?portionen=8"); // as the recipe page links to it
+        var page = Render<CookMode>(parameters => parameters.Add(p => p.Id, SoupId));
+
+        Assert.Equal("Kartoffeln schälen.", page.Find("[data-testid=step-text]").TextContent);
+        Assert.Equal("1 kg Kartoffeln", page.Find("[data-testid=needed]").TextContent.Trim());
+
+        page.Find("[data-testid=next]").Click();
+
+        Assert.Equal("Mit Salz kochen.", page.Find("[data-testid=step-text]").TextContent);
+        Assert.Equal("Salz", page.Find("[data-testid=needed]").TextContent.Trim());
+        Assert.NotNull(page.Find("[data-testid=done]"));
+        JSInterop.VerifyInvoke("koch.keepScreenOn");
     }
 
     [Fact]

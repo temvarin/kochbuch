@@ -19,7 +19,7 @@ public sealed class PhotoTests : AppTestContext
         page.FindComponent<Microsoft.AspNetCore.Components.Forms.InputFile>().UploadFiles(file);
         page.WaitForAssertion(() => Assert.Contains("Anderes Foto", page.Markup));
 
-        page.Find("form").Submit();
+        page.Find("[data-testid=save]").Click();
 
         var recipe = Assert.Single(Recipes.All);
         var (path, upload) = Assert.Single(Server.Uploaded);
@@ -38,13 +38,13 @@ public sealed class PhotoTests : AppTestContext
         page.FindComponent<Microsoft.AspNetCore.Components.Forms.InputFile>()
             .UploadFiles(InputFileContent.CreateFromBinary([1, 2, 3], "suppe.jpg", contentType: "image/jpeg"));
         page.WaitForAssertion(() => Assert.Contains("Ohne Verbindung", page.Find("[data-testid=photo-error]").TextContent));
-        page.Find("form").Submit();
+        page.Find("[data-testid=save]").Click();
 
         Assert.Null(Assert.Single(Recipes.All).Photo);
     }
 
     [Fact]
-    public void The_cook_view_shows_the_photo_from_the_gateway_and_a_placeholder_until_it_is_ready()
+    public void The_recipe_page_shows_the_photo_from_the_gateway_and_the_recipes_tile_until_it_is_ready()
     {
         var photo = new Guid("3c9e8f10-5a1b-4c2d-8e3f-4a5b6c7d8e9f");
         Recipes.Save(new Recipe(SoupId, "Kartoffelsuppe", 4, [new RecipeLine("Kartoffeln", new Quantity(500, Unit.Gramm))], [], photo: photo));
@@ -55,7 +55,8 @@ public sealed class PhotoTests : AppTestContext
 
         image.TriggerEvent("onerror", new Microsoft.AspNetCore.Components.Web.ErrorEventArgs());
 
-        Assert.Contains("wird noch vorbereitet", page.Markup);
+        Assert.Empty(page.FindAll("[data-testid=photo]"));
+        Assert.Equal("K", page.Find(".hero .cover").TextContent);
     }
 
     [Fact]
@@ -65,7 +66,7 @@ public sealed class PhotoTests : AppTestContext
         var page = Render<RecipeEdit>(p => p.Add(x => x.Id, SoupId));
 
         page.FindAll("button").Single(b => b.TextContent.Contains("Foto entfernen")).Click();
-        page.Find("form").Submit();
+        page.Find("[data-testid=save]").Click();
 
         Assert.Null(Recipes.Find(SoupId)!.Photo);
     }

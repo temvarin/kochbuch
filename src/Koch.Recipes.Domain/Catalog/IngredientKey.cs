@@ -5,27 +5,9 @@ using Koch.Kernel;
 namespace Koch.Recipes.Domain.Catalog;
 
 /// <summary>
-/// An ingredient both phones know, with where to find it in the shop. Its id is derived from its name, so when both
-/// phones add "Kartoffeln" while offline, they add the same item, and the sync merges them instead of keeping two that
-/// the shopping list would not add up (docs/adr/0004).
+/// An ingredient's identity, from its name. Two lines naming the same ingredient are added up on a shopping list and
+/// matched by the recipe merge, whichever phone wrote them and however they spelled the case (docs/adr/0004, 0013).
 /// </summary>
-public sealed record Ingredient : IItem
-{
-    /// <exception cref="ArgumentException">No name, or too long.</exception>
-    public Ingredient(string name, Aisle aisle)
-    {
-        Name = Text.Check(Text.OneLine(name), Cooking.RecipeLine.MaxName, "ingredient");
-        if (!Enum.IsDefined(aisle)) throw new ArgumentException($"Unknown aisle {aisle}.");
-        Aisle = aisle;
-    }
-
-    public string Name { get; }
-
-    public Aisle Aisle { get; }
-
-    public Guid Id => IngredientKey.Of(Name);
-}
-
 public static class IngredientKey
 {
     /// <summary>

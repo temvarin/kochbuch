@@ -168,7 +168,7 @@ public class BasesTests
         phone.Change(book => book.Save(new Recipe(Known.SoupId, "Annas Suppe", 4, [], [])).Save(fresh));
         var pending = phone.StartSync();
 
-        Assert.Equal([Known.Soup()], phone.BasesFor(pending.Changes));
+        Assert.Equal([Known.Soup()], pending.Changes.BasesIn(phone.State?.Base));
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public class BasesTests
         phone.Change(book => book.Save(new Recipe(Known.SoupId, "Annas Suppe", 4, [], [])));
         phone.SyncFailed(phone.StartSync());
 
-        Assert.Equal([Known.Soup()], phone.BasesFor(phone.StartSync().Changes));
+        Assert.Equal([Known.Soup()], phone.StartSync().Changes.BasesIn(phone.State?.Base));
     }
 
     [Fact]
@@ -189,6 +189,6 @@ public class BasesTests
         var phone = new SyncedBook();
         phone.Change(book => book.Save(Known.Soup()));
 
-        Assert.Empty(phone.BasesFor(phone.StartSync().Changes));
+        Assert.Empty(phone.StartSync().Changes.BasesIn(phone.State?.Base));
     }
 }

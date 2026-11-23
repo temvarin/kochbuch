@@ -9,7 +9,7 @@ namespace Koch.Recipes.Outbox;
 /// <summary>
 /// An outbox row as the message Media receives: a CloudEvent in structured JSON, so the envelope (type, source, id,
 /// time, sequence) is a published standard and only the data is ours (Koch.Recipes.Events; samples in
-/// tests/Koch.Recipes.Tests/Contracts/events).
+/// tests/Koch.Recipes.Tests/Contracts/event-photo-*).
 /// </summary>
 public static class CloudEvents
 {

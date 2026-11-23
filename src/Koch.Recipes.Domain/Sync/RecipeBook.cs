@@ -5,51 +5,37 @@ using Koch.Kernel;
 namespace Koch.Recipes.Domain.Sync;
 
 /// <summary>
-/// Everything the household shares through the Recipes service: the recipes and the ingredient catalogue. Immutable;
-/// every change gives a new book.
+/// Everything the household shares through the Recipes service: its recipes. Immutable; every change gives a new book.
 /// </summary>
 public sealed record RecipeBook : ISyncBook<RecipeBook, BookChanges>
 {
-    public static RecipeBook Empty { get; } = new([], []);
+    public static RecipeBook Empty { get; } = new([]);
 
-    /// <exception cref="ArgumentException">Two recipes or two ingredients with the same id.</exception>
-    public RecipeBook(IEnumerable<Recipe> recipes, IEnumerable<Ingredient> ingredients)
+    /// <exception cref="ArgumentException">Two recipes with the same id.</exception>
+    public RecipeBook(IEnumerable<Recipe> recipes)
     {
         Recipes = recipes.ToValueList();
-        Ingredients = ingredients.ToValueList();
         if (Recipes.DistinctBy(r => r.Id).Count() != Recipes.Count) throw new ArgumentException("Two recipes share an id.");
-        if (Ingredients.DistinctBy(i => i.Id).Count() != Ingredients.Count)
-            throw new ArgumentException("Two ingredients share a name.");
     }
 
     public ValueList<Recipe> Recipes { get; }
 
-    public ValueList<Ingredient> Ingredients { get; }
-
     public Recipe? Find(Guid id) => Recipes.FirstOrDefault(r => r.Id == id);
 
-    /// <summary>
-    /// Adds or replaces the recipe, and adds the ingredients it names that the catalogue doesn't know yet (in
-    /// <see cref="Aisle.Sonstiges"/>), so they are offered next time.
-    /// </summary>
-    public RecipeBook Save(Recipe recipe)
-    {
-        var known = Ingredients.Select(i => i.Id).ToHashSet();
-        var added = recipe.Lines.Select(l => l.Ingredient).DistinctBy(IngredientKey.Of)
-            .Where(name => !known.Contains(IngredientKey.Of(name))).Select(name => new Ingredient(name, Aisle.Sonstiges));
-        var recipes = Find(recipe.Id) is null ? [.. Recipes, recipe] : Recipes.Select(r => r.Id == recipe.Id ? recipe : r);
-        return new(recipes, [.. Ingredients, .. added]);
-    }
+    /// <summary>Every ingredient the recipes name, once, by name: the suggestions while typing.</summary>
+    public IReadOnlyList<string> IngredientNames =>
+    [
+        .. Recipes.SelectMany(r => r.Lines).Select(l => l.Ingredient)
+            .DistinctBy(IngredientKey.Of).Order(StringComparer.OrdinalIgnoreCase),
+    ];
 
-    /// <summary>Removes the recipe; its ingredients stay in the catalogue.</summary>
-    public RecipeBook Remove(Guid recipeId) => new(Recipes.Where(r => r.Id != recipeId), Ingredients);
+    /// <summary>Adds or replaces the recipe.</summary>
+    public RecipeBook Save(Recipe recipe) =>
+        new(Find(recipe.Id) is null ? [.. Recipes, recipe] : Recipes.Select(r => r.Id == recipe.Id ? recipe : r));
 
-    /// <summary>Adds or replaces the ingredient with the same name (case and spacing don't count).</summary>
-    public RecipeBook Save(Ingredient ingredient) =>
-        new(Recipes, [.. Ingredients.Where(i => i.Id != ingredient.Id), ingredient]);
+    public RecipeBook Remove(Guid recipeId) => new(Recipes.Where(r => r.Id != recipeId));
 
-    public RecipeBook Apply(BookChanges changes) =>
-        new(changes.Recipes.ApplyTo(Recipes), changes.Ingredients.ApplyTo(Ingredients));
+    public RecipeBook Apply(BookChanges changes) => new(changes.Recipes.ApplyTo(Recipes));
 
     /// <summary>
     /// As the service applies a phone's changes: a changed recipe the phone sent with its base is merged with the one
@@ -68,19 +54,32 @@ public sealed record RecipeBook : ISyncBook<RecipeBook, BookChanges>
 }
 
 /// <summary>What changed in a <see cref="RecipeBook"/>.</summary>
-public sealed record BookChanges(ItemChanges<Recipe> Recipes, ItemChanges<Ingredient> Ingredients)
-    : IBookChanges<RecipeBook, BookChanges>
+public sealed record BookChanges(ItemChanges<Recipe> Recipes) : IBookChanges<RecipeBook, BookChanges>
 {
-    public static BookChanges None { get; } = new(ItemChanges.None<Recipe>(), ItemChanges.None<Ingredient>());
+    public static BookChanges None { get; } = new(ItemChanges.None<Recipe>());
 
-    public bool IsEmpty => Recipes.IsEmpty && Ingredients.IsEmpty;
+    public bool IsEmpty => Recipes.IsEmpty;
 
-    public static BookChanges Between(RecipeBook before, RecipeBook after) =>
-        new(ItemChanges.Between(before.Recipes, after.Recipes), ItemChanges.Between(before.Ingredients, after.Ingredients));
+    public static BookChanges Between(RecipeBook before, RecipeBook after) => new(ItemChanges.Between(before.Recipes, after.Recipes));
 
     /// <summary>For an item in both, this one's version.</summary>
-    public BookChanges Union(BookChanges other) => new(Recipes.Union(other.Recipes), Ingredients.Union(other.Ingredients));
+    public BookChanges Union(BookChanges other) => new(Recipes.Union(other.Recipes));
 
     /// <summary>The same items as they are in <paramref name="book"/> now.</summary>
-    public BookChanges Now(RecipeBook book) => new(Recipes.Now(book.Recipes), Ingredients.Now(book.Ingredients));
+    public BookChanges Now(RecipeBook book) => new(Recipes.Now(book.Recipes));
+
+    /// <summary>
+    /// What the service needs to merge the changed recipes with edits from the other phone: each one as the phone last
+    /// got it from the service (docs/adr/0012); none for a new recipe, none before the first sync.
+    /// <para>
+    /// Also after syncs that got no answer, which is what editing offline looks like. If such a sync did arrive, the
+    /// service already has the phone's earlier edit; the merge keeps it unless the phone changed the same part again.
+    /// Only one case comes out wrong: a part changed in the lost sync and then changed back to exactly what the base
+    /// had. The service keeps the earlier edit, and the phone shows it after the sync, to be changed back again.
+    /// </para>
+    /// </summary>
+    /// <param name="confirmed">The book as the service last confirmed it (the sync base); null before the first sync.</param>
+    public IReadOnlyList<Recipe> BasesIn(RecipeBook? confirmed) => confirmed is null
+        ? []
+        : [.. Recipes.Changed.Select(r => confirmed.Find(r.Id)).OfType<Recipe>()];
 }

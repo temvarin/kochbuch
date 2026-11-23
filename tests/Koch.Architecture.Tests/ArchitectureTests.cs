@@ -15,7 +15,7 @@ namespace Koch.Architecture.Tests;
 
 /// <summary>
 /// The boundaries the code must keep, checked on the compiled code (fitness functions, FOSA ch06). The services are
-/// separate deployables that talk over HTTP only; what they share is a small, stable kernel (units, aisles, the sync
+/// separate deployables that talk over HTTP only; what they share is a small, stable kernel (units, the sync
 /// abstractions) and contract libraries, one per producer, so that no one depends on things it doesn't use (Clean Code
 /// ch20: CRP, SDP, SAP). Each rule says why it exists (docs/adr/0001, 0005).
 /// </summary>

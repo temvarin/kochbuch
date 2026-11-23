@@ -1,9 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Koch.Kernel;
 using Koch.Kernel.Measures;
-using Koch.Recipes.Domain.Catalog;
 using Koch.Recipes.Domain.Cooking;
 using Koch.Recipes.Domain.Sync;
 using Koch.Recipes.Storage;
@@ -23,17 +21,16 @@ public class RowContractTests
     private static RecipeBook Book() => RecipeBook.Empty
         .Save(new Recipe(new Guid("6f1d1c2a-7b4e-4c55-9d2b-1e0b5a6c7d80"), "Kartoffelsuppe", 4,
             [new RecipeLine("Kartoffeln", new Quantity(500, Unit.Gramm), "festkochend"), new RecipeLine("Salz", null)],
-            ["Kartoffeln schälen und würfeln.", "Kochen."], "Schmeckt am nächsten Tag noch besser."))
-        .Save(new Ingredient("Kartoffeln", Aisle.ObstGemuese));
+            ["Kartoffeln schälen und würfeln.", "Kochen."], "Schmeckt am nächsten Tag noch besser."));
 
     private static string Written(string name) => name switch
     {
-        "row-recipe" => Rows.For(BookChanges.Between(RecipeBook.Empty, Book())).Single(r => r.Id.StartsWith("recipe:", StringComparison.Ordinal)).Json!,
-        "row-ingredient" => Rows.For(BookChanges.Between(RecipeBook.Empty, Book())).Single(r => r.Json!.Contains("Kartoffeln", StringComparison.Ordinal) && r.Id.StartsWith("ingredient:", StringComparison.Ordinal)).Json!,
+        "row-recipe" => Rows.For(BookChanges.Between(RecipeBook.Empty, Book())).Single().Json!,
         _ => throw new ArgumentException(name),
     };
 
-    public static TheoryData<string> Names => ["row-recipe", "row-ingredient"];
+    // "row-ingredient" holds rows of the catalogue removed by docs/adr/0013: no longer written, still in the tables.
+    public static TheoryData<string> Names => ["row-recipe"];
 
     [Theory, MemberData(nameof(Names))]
     public void This_version_writes_exactly_the_newest_sample(string name)
@@ -53,21 +50,20 @@ public class RowContractTests
     }
 
     [Fact]
-    public void Every_row_sample_reads_back_to_the_same_book()
+    public void Every_row_sample_reads_back_to_the_same_book_and_old_ingredient_rows_are_ignored()
     {
         var recipes = Directory.GetFiles(Path.Combine(Folder, "row-recipe"), "v*.json");
         var ingredients = Directory.GetFiles(Path.Combine(Folder, "row-ingredient"), "v*.json");
         Assert.NotEmpty(recipes);
         Assert.NotEmpty(ingredients);
 
-        foreach (var (recipe, ingredient) in recipes.Zip(ingredients))
+        foreach (var recipe in recipes)
         {
             var book = Rows.ToBook([
                 new StoredRow("recipe:x", File.ReadAllText(recipe)),
-                new StoredRow("ingredient:x", File.ReadAllText(ingredient)),
+                .. ingredients.Select(i => new StoredRow("ingredient:x", File.ReadAllText(i))),
             ]);
             Assert.Equal(Book().Recipes, book.Recipes);
-            Assert.Equal("Kartoffeln", Assert.Single(book.Ingredients).Name);
         }
     }
 

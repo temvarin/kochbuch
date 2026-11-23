@@ -9,25 +9,28 @@ namespace Koch.Shopping.Contracts;
 /// <param name="Unit">"g", "kg", "ml", "l", "TL", "EL", "Stück", "Dose", …</param>
 public sealed record AmountJson(decimal Value, string Unit);
 
-public sealed record ListJson(Guid Id, string Title, DateTimeOffset Created);
-
 /// <param name="Amount">null: no amount.</param>
-/// <param name="Aisle">"obst-gemuese", "kuehlregal", …</param>
 /// <param name="Recipe">The recipe it is for; null if added by hand.</param>
-public sealed record ItemJson(Guid Id, Guid ListId, string Name, AmountJson? Amount, string Aisle, bool Checked, string? Recipe);
-
-public sealed record ListChangesJson(IReadOnlyList<ListJson> Changed, IReadOnlyList<Guid> Removed);
+/// <remarks>
+/// Protocol 1 also had "aisle" (docs/adr/0013), protocols 1 and 2 "listId" (docs/adr/0014); readers ignore them in
+/// older rows and samples.
+/// </remarks>
+public sealed record ItemJson(Guid Id, string Name, AmountJson? Amount, bool Checked, string? Recipe);
 
 public sealed record ItemChangesJson(IReadOnlyList<ItemJson> Changed, IReadOnlyList<Guid> Removed);
 
-public sealed record ShoppingSyncRequestJson(int Protocol, ListChangesJson Lists, ItemChangesJson Items)
+/// <remarks>Protocols 1 and 2 also had "lists"; readers ignore it (docs/adr/0014).</remarks>
+public sealed record ShoppingSyncRequestJson(int Protocol, ItemChangesJson Items)
 {
-    /// <summary>The service answers 409 to any other, and the app asks to be reloaded.</summary>
-    public const int CurrentProtocol = 1;
+    /// <summary>
+    /// The service answers 409 to any other, and the app asks to be reloaded. 2 since 2026-11-22: items have no aisle
+    /// (docs/adr/0013). 3 since 2026-11-22: one list (docs/adr/0014).
+    /// </summary>
+    public const int CurrentProtocol = 3;
 }
 
-/// <summary>All lists and items as the service has them after applying the request: the phone's new base.</summary>
-public sealed record ShoppingSyncResponseJson(IReadOnlyList<ListJson> Lists, IReadOnlyList<ItemJson> Items);
+/// <summary>The whole list as the service has it after applying the request: the phone's new base.</summary>
+public sealed record ShoppingSyncResponseJson(IReadOnlyList<ItemJson> Items);
 
 /// <summary>The serializer for the Shopping API, generated at build time (no reflection in the browser).</summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web,

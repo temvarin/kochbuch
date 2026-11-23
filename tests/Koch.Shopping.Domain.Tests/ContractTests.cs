@@ -22,10 +22,10 @@ public class ContractTests
         new("local", ShoppingStore.Schema, () => ShoppingStore.Serialize(LocalLists()),
             json => ShoppingStore.TryRead(json) is { } lists ? ShoppingStore.Serialize(lists) : null),
         new("sync-request", ShoppingSyncRequestJson.CurrentProtocol,
-            () => JsonSerializer.Serialize(ShoppingChanges.Between(ShoppingBook.Empty, Known.Lists()).ToJson(), ShoppingJson.Default.ShoppingSyncRequestJson),
+            () => JsonSerializer.Serialize(ShoppingChanges.Between(ShoppingBook.Empty, Known.List()).ToJson(), ShoppingJson.Default.ShoppingSyncRequestJson),
             json => JsonSerializer.Serialize(JsonSerializer.Deserialize(json, ShoppingJson.Default.ShoppingSyncRequestJson)!.ToDomain().ToJson(), ShoppingJson.Default.ShoppingSyncRequestJson)),
         new("sync-response", ShoppingSyncRequestJson.CurrentProtocol,
-            () => JsonSerializer.Serialize(Known.Lists().ToJson(), ShoppingJson.Default.ShoppingSyncResponseJson),
+            () => JsonSerializer.Serialize(Known.List().ToJson(), ShoppingJson.Default.ShoppingSyncResponseJson),
             json => JsonSerializer.Serialize(JsonSerializer.Deserialize(json, ShoppingJson.Default.ShoppingSyncResponseJson)!.ToDomain().ToJson(), ShoppingJson.Default.ShoppingSyncResponseJson)),
     ];
 
@@ -33,9 +33,9 @@ public class ContractTests
     private static SyncedShopping LocalLists()
     {
         var phone = new SyncedShopping();
-        phone.Change(_ => Known.Lists());
-        phone.CompleteSync(phone.StartSync(), Known.Lists(), Known.Now);
-        phone.Change(b => b.Check(Known.ListId, "kartoffeln", true));
+        phone.Change(_ => Known.List());
+        phone.CompleteSync(phone.StartSync(), Known.List(), Known.Now);
+        phone.Change(b => b.Check("kartoffeln", true));
         phone.SyncFailed(phone.StartSync());
         return phone;
     }
@@ -74,15 +74,18 @@ public class ContractTests
     }
 
     [Theory, MemberData(nameof(Samples))]
-    public void Every_sample_is_read_and_written_again_without_losing_anything(string name, string file)
+    public void Every_sample_stays_readable_and_the_current_ones_lose_nothing(string name, string file)
     {
         var contract = Contracts.Single(c => c.Name == name);
         var sample = File.ReadAllText(Path.Combine(Folder, name, file));
 
         var reread = contract.Reread(sample);
 
+        // Every sample stays readable. Only the current version's must come back unchanged: an older one may hold a
+        // field that was removed since, like the aisles of protocol 1 (docs/adr/0013).
         Assert.NotNull(reread);
-        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(sample), JsonNode.Parse(reread)), $"{name}/{file} changed when read and written again.");
+        if (Version(Path.Combine(Folder, name, file)) == contract.Version)
+            Assert.True(JsonNode.DeepEquals(JsonNode.Parse(sample), JsonNode.Parse(reread)), $"{name}/{file} changed when read and written again.");
     }
 
     private static IEnumerable<string> SamplesOf(string name)

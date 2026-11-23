@@ -2,10 +2,7 @@ namespace Koch.Shopping.Domain.Tests;
 
 public class ShoppingBookTests
 {
-    private static readonly Guid ListId = new("11111111-1111-1111-1111-111111111111");
     private static readonly DateTimeOffset Now = new(2026, 11, 22, 18, 0, 0, TimeSpan.Zero);
-
-    private static ShoppingBook WithList() => ShoppingBook.Empty.Save(new ShoppingList(ListId, "Wocheneinkauf", Now));
 
     private static Func<Guid> Ids(int start = 1)
     {
@@ -13,73 +10,64 @@ public class ShoppingBookTests
         return () => new Guid($"00000000-0000-0000-0000-{next++:D12}");
     }
 
-    private static PlannedLine Line(string name, decimal? amount, Unit unit = Unit.Gramm, string recipe = "Suppe", Aisle aisle = Aisle.ObstGemuese) =>
-        new(name, amount is { } a ? new Quantity(a, unit) : null, aisle, recipe);
+    private static PlannedLine Line(string name, decimal? amount, Unit unit = Unit.Gramm, string recipe = "Suppe") =>
+        new(name, amount is { } a ? new Quantity(a, unit) : null, recipe);
 
     [Fact]
     public void Two_recipes_with_the_same_ingredient_make_one_line_with_the_sum()
     {
-        var book = WithList()
-            .Add(ListId, [Line("Kartoffeln", 500, recipe: "Suppe"), Line("Salz", null)], Ids(1))
-            .Add(ListId, [Line(" kartoffeln", 300, recipe: "Auflauf")], Ids(10));
+        var book = ShoppingBook.Empty
+            .Add([Line("Kartoffeln", 500, recipe: "Suppe"), Line("Salz", null)], Ids(1))
+            .Add([Line(" kartoffeln", 300, recipe: "Auflauf")], Ids(10));
 
-        var potatoes = Assert.Single(book.Lines(ListId), l => l.Key == "kartoffeln");
+        var potatoes = Assert.Single(book.Lines(), l => l.Key == "kartoffeln");
         Assert.Equal([new Quantity(800, Unit.Gramm)], potatoes.Missing);
         Assert.Equal(["Auflauf", "Suppe"], potatoes.Recipes.Order(StringComparer.Ordinal));
-        Assert.Empty(Assert.Single(book.Lines(ListId), l => l.Key == "salz").Missing);
+        Assert.Empty(Assert.Single(book.Lines(), l => l.Key == "salz").Missing);
     }
 
     [Fact]
-    public void Lines_follow_the_walk_through_the_shop_and_ticked_ones_go_last()
+    public void Open_lines_come_first_by_name_and_ticked_ones_go_last()
     {
-        var book = WithList().Add(ListId,
-            [Line("Milch", 1, Unit.Liter, aisle: Aisle.Kuehlregal), Line("Äpfel", 1, Unit.Kilogramm), Line("Mehl", 1, Unit.Kilogramm, aisle: Aisle.Backen)], Ids());
-        book = book.Check(ListId, "äpfel", true);
+        var book = ShoppingBook.Empty.Add(
+            [Line("Milch", 1, Unit.Liter), Line("Brot", 1, Unit.Stueck), Line("Mehl", 1, Unit.Kilogramm)], Ids());
+        book = book.Check("brot", true);
 
-        Assert.Equal(["milch", "mehl", "äpfel"], book.Lines(ListId).Select(l => l.Key));
-    }
-
-    [Fact]
-    public void The_catalogues_current_aisle_wins_over_the_one_the_item_was_added_with()
-    {
-        var book = WithList().Add(ListId, [Line("Milch", 1, Unit.Liter, aisle: Aisle.Sonstiges), Line("Brot", 1, Unit.Stueck, aisle: Aisle.Brot)], Ids());
-
-        var lines = book.Lines(ListId, name => name == "Milch" ? Aisle.ObstGemuese : null);
-
-        Assert.Equal(["milch", "brot"], lines.Select(l => l.Key));
+        Assert.Equal(["mehl", "milch", "brot"], book.Lines().Select(l => l.Key));
     }
 
     /// <summary>Anna has bought the potatoes; meanwhile Ben adds a recipe that needs more. The line comes back with what is missing.</summary>
     [Fact]
     public void A_ticked_line_comes_back_with_what_a_newly_added_recipe_still_needs()
     {
-        var book = WithList().Add(ListId, [Line("Kartoffeln", 800)], Ids(1)).Check(ListId, "kartoffeln", true);
+        var book = ShoppingBook.Empty.Add([Line("Kartoffeln", 800)], Ids(1)).Check("kartoffeln", true);
 
-        book = book.Add(ListId, [Line("Kartoffeln", 300, recipe: "Auflauf")], Ids(10));
+        book = book.Add([Line("Kartoffeln", 300, recipe: "Auflauf")], Ids(10));
 
-        var line = Assert.Single(book.Lines(ListId));
+        var line = Assert.Single(book.Lines());
         Assert.False(line.Checked);
         Assert.Equal([new Quantity(300, Unit.Gramm)], line.Missing);
         Assert.Equal([new Quantity(1.1m, Unit.Kilogramm)], line.Total);
     }
 
     [Fact]
-    public void Removing_the_ticked_items_leaves_the_rest_and_removing_the_list_leaves_nothing()
+    public void Removing_the_ticked_items_leaves_the_rest()
     {
-        var book = WithList().Add(ListId, [Line("Kartoffeln", 800), Line("Salz", null)], Ids()).Check(ListId, "salz", true);
+        var book = ShoppingBook.Empty.Add([Line("Kartoffeln", 800), Line("Salz", null)], Ids()).Check("salz", true);
 
-        book = book.RemoveChecked(ListId);
-        Assert.Equal(["kartoffeln"], book.Lines(ListId).Select(l => l.Key));
+        book = book.RemoveChecked();
 
-        book = book.RemoveList(ListId);
-        Assert.Empty(book.Lists);
-        Assert.Empty(book.Items);
+        Assert.Equal(["kartoffeln"], book.Lines().Select(l => l.Key));
     }
 
     [Fact]
-    public void Nothing_goes_on_a_list_that_does_not_exist()
+    public void The_recipes_still_to_shop_for_are_those_with_something_unticked()
     {
-        Assert.Throws<ArgumentException>(() => ShoppingBook.Empty.Add(ListId, [Line("Salz", null)], Ids()));
+        var book = ShoppingBook.Empty
+            .Add([Line("Kartoffeln", 500, recipe: "Suppe"), Line("Sahne", 200, Unit.Milliliter, recipe: "Gratin")], Ids())
+            .Check("sahne", true);
+
+        Assert.Equal(["Suppe"], book.OpenRecipes);
     }
 
     // Sync
@@ -98,26 +86,22 @@ public class ShoppingBookTests
     }
 
     [Fact]
-    public void Recipes_both_phones_add_to_one_list_while_offline_add_up_instead_of_overwriting_each_other()
+    public void Recipes_both_phones_add_while_offline_add_up_instead_of_overwriting_each_other()
     {
         var (service, anna, ben) = (new Service(), new SyncedShopping(), new SyncedShopping());
-        anna.Change(b => b.Save(new ShoppingList(ListId, "Wocheneinkauf", Now)));
-        service.Sync(anna);
-        service.Sync(ben);
-
-        anna.Change(b => b.Add(ListId, [Line("Kartoffeln", 500, recipe: "Suppe")], Ids(100)));
-        ben.Change(b => b.Add(ListId, [Line("Kartoffeln", 300, recipe: "Auflauf")], Ids(200)));
+        anna.Change(b => b.Add([Line("Kartoffeln", 500, recipe: "Suppe")], Ids(100)));
+        ben.Change(b => b.Add([Line("Kartoffeln", 300, recipe: "Auflauf")], Ids(200)));
         service.Sync(anna);
         service.Sync(ben);
         service.Sync(anna);
 
         foreach (var phone in new[] { anna, ben })
-            Assert.Equal([new Quantity(800, Unit.Gramm)], Assert.Single(phone.Book.Lines(ListId)).Missing);
+            Assert.Equal([new Quantity(800, Unit.Gramm)], Assert.Single(phone.Book.Lines()).Missing);
     }
 
     /// <summary>Two phones in the shop tick, untick, add and lose answers in random order; they end up the same.</summary>
     [Fact]
-    public void Whatever_happens_in_the_shop_both_phones_end_up_with_the_services_lists()
+    public void Whatever_happens_in_the_shop_both_phones_end_up_with_the_services_list()
     {
         string[] names = ["Kartoffeln", "Milch", "Salz", "Mehl"];
         for (var seed = 0; seed < 200; seed++)
@@ -125,9 +109,6 @@ public class ShoppingBookTests
             var random = new Random(seed);
             var service = new Service();
             SyncedShopping[] phones = [new(), new()];
-            phones[0].Change(b => b.Save(new ShoppingList(ListId, "Einkauf", Now)));
-            service.Sync(phones[0]);
-            service.Sync(phones[1]);
             var ids = 0;
             for (var step = 0; step < 40; step++)
             {
@@ -137,13 +118,13 @@ public class ShoppingBookTests
                 {
                     case 0:
                         var id = new Guid($"00000000-0000-0000-{seed:D4}-{++ids:D12}");
-                        phone.Change(b => b.Add(ListId, [Line(name, random.Next(1, 500))], () => id));
+                        phone.Change(b => b.Add([Line(name, random.Next(1, 500))], () => id));
                         break;
                     case 1:
-                        phone.Change(b => b.Check(ListId, name.ToLowerInvariant(), random.Next(2) == 0));
+                        phone.Change(b => b.Check(name.ToLowerInvariant(), random.Next(2) == 0));
                         break;
                     case 2:
-                        phone.Change(b => b.RemoveChecked(ListId));
+                        phone.Change(b => b.RemoveChecked());
                         break;
                     case 3:
                         service.Sync(phone, loseAnswer: random.Next(3) == 0);
@@ -159,7 +140,7 @@ public class ShoppingBookTests
 
             foreach (var phone in phones)
             {
-                Assert.Equal(service.Book.Lines(ListId), phone.Book.Lines(ListId), LinesEqual);
+                Assert.Equal(service.Book.Lines(), phone.Book.Lines(), LinesEqual);
                 Assert.False(phone.HasUnsyncedChanges, $"seed {seed}");
             }
         }

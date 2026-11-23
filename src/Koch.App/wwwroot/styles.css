@@ -2,15 +2,15 @@
 @font-face { font-family: "Onest"; font-weight: 400 700; font-display: swap; src: url(fonts/onest-latin.woff2) format("woff2"); }
 @font-face { font-family: "Unbounded"; font-weight: 600 700; font-display: swap; src: url(fonts/unbounded-latin.woff2) format("woff2"); }
 
-/* One accent (gold) for the main action and for planned money. Ink marks fixed costs, red negative amounts.
+/* One accent (gold) for the main action of a screen and for what is done; ink for outlines, shadows and strong fills.
    Every text colour meets WCAG AA (4.5:1) on the surfaces it is used on, in both modes. */
 :root {
   --bg: #FBF8F1;
   --surface: #FFFFFF;
-  --ink: #111111;          /* outlines, shadows, strong fills */
+  --ink: #111111;
   --text: #111111;
   --muted: #4A4A4A;
-  --faded: #6F6B62;        /* fixed costs already debited */
+  --faded: #6F6B62;        /* what is done: ticked lines */
   --faded-line: #CFCABE;
   --gold: #FFCE00;
   --on-gold: #111111;
@@ -48,15 +48,21 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 a { color: inherit; }
-h2 { margin: 0; }
+h1, h2 { margin: 0; }
 
 .icon { width: 1.25em; height: 1.25em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .display { font-family: var(--display); font-weight: 700; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.muted { color: var(--muted); font-size: 15px; }
+.hint { color: var(--muted); font-size: 14px; margin: 8px 0 16px; }
+.label { color: var(--muted); font-size: 14px; font-weight: 700; }
+.empty { color: var(--muted); font-size: 15px; padding: 14px 0; margin: 0; }
+.error { color: var(--bad); font-weight: 700; }
+.amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* Top bar */
+/* Top bar, for pages with a back arrow. The main pages bring their own header; then it stays empty and hidden. */
 .topbar {
   position: sticky;
   top: 0;
@@ -69,10 +75,9 @@ h2 { margin: 0; }
   background: var(--bg);
   border-bottom: 2px solid var(--ink);
 }
+.topbar:not(:has(*)) { display: none; }
 .topbar .titles { flex: 1; min-width: 0; padding: 10px 0; }
-.topbar h1 { margin: 0; font: 700 17px/1.2 var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.topbar .kicker { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.topbar:has(.kicker) h1 { font-size: 24px; margin-top: 2px; }
+.topbar h1 { font: 700 17px/1.2 var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .icon-btn { display: grid; place-items: center; width: 44px; height: 44px; margin-left: -10px; border: 0; background: none; font-size: 22px; cursor: pointer; text-decoration: none; }
 .icon-btn.end-btn { margin: 0 -10px 0 0; }
 
@@ -90,7 +95,7 @@ main {
   display: flex;
   justify-content: center;
   padding: 0 max(8px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(8px, env(safe-area-inset-left));
-  background: var(--bg);
+  background: var(--surface);
   border-top: 2px solid var(--ink);
 }
 .tabbar a {
@@ -103,40 +108,24 @@ main {
   gap: 2px;
   height: var(--tabbar);
   font-size: 13px;
-  font-weight: 700;
   color: var(--muted);
   text-decoration: none;
 }
-.tabbar a .icon { font-size: 22px; padding: 2px 14px; box-sizing: content-box; border-radius: 99px; }
-.tabbar a.active { color: var(--text); }
-.tabbar a.active .icon { background: var(--gold); color: var(--on-gold); box-shadow: 0 0 0 2px var(--ink); }
+.tab-icon { display: flex; padding: 2px 14px; border-radius: 99px; font-size: 20px; }
+.tabbar a.active { color: var(--text); font-weight: 700; }
+.tabbar a.active .tab-icon { background: var(--gold); color: var(--on-gold); box-shadow: 0 0 0 2px var(--ink); }
 
 /* Surfaces: thick outline and a flat offset shadow */
-.card, .btn, .modal-box, .field input, .field select, .banner {
+.card, .btn, .field input, .field textarea, .search, .banner {
   border: 2px solid var(--ink);
   border-radius: var(--radius);
   background: var(--surface);
 }
-.card, .btn, .modal-box, .banner { box-shadow: 3px 3px 0 var(--ink); }
-.card { display: block; width: 100%; padding: 16px; margin-bottom: 16px; text-align: left; }
-.card > :first-child { margin-top: 0; }
-.card > :last-child { margin-bottom: 0; }
-button.card, a.card, .card.tappable { cursor: pointer; text-decoration: none; transition: transform 100ms ease-out, box-shadow 100ms ease-out; }
-/* A card with block content can't be a button, so a button covers it instead. */
-.card.tappable { position: relative; }
-.card.tappable > .cover { position: absolute; inset: 0; margin: 0; padding: 0; border: 0; border-radius: inherit; background: none; cursor: pointer; }
-.card.tappable:has(> .cover:active) { transform: translate(3px, 3px); box-shadow: none; }
-
-.muted { color: var(--muted); font-size: 15px; }
-.hint { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
-.row { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
-.label { color: var(--muted); font-size: 14px; }
-small { display: block; font-weight: 400; font-size: 14px; color: var(--muted); }
-
-/* Amounts: tabular figures, so they line up in lists */
-.amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.big { font: 700 32px/1.15 var(--display); margin: 2px 0 6px; letter-spacing: -.02em; }
-.negative { color: var(--bad); }
+.card, .btn, .banner { box-shadow: 3px 3px 0 var(--ink); }
+.card { display: block; width: 100%; padding: 16px; margin: 0 0 16px; }
+.list { padding: 0 16px; list-style: none; }
+.list ul { list-style: none; margin: 0; padding: 0; }
+.list li + li, .list ul + ul { border-top: 1px solid var(--faded-line); }
 
 /* Buttons: pressable, they sink into their shadow */
 .btn {
@@ -145,7 +134,7 @@ small { display: block; font-weight: 400; font-size: 14px; color: var(--muted); 
   justify-content: center;
   gap: 8px;
   width: 100%;
-  min-height: 48px;
+  min-height: 52px;
   padding: 12px 16px;
   font-weight: 700;
   text-align: center;
@@ -153,124 +142,176 @@ small { display: block; font-weight: 400; font-size: 14px; color: var(--muted); 
   cursor: pointer;
   transition: transform 100ms ease-out, box-shadow 100ms ease-out;
 }
-.btn:active:not(:disabled), button.card:active, a.card:active, .banner:active { transform: translate(3px, 3px); box-shadow: none; }
+.btn:active:not(:disabled), .banner:active, .tile:active .cover { transform: translate(3px, 3px); box-shadow: none; }
 .btn.primary { background: var(--gold); color: var(--on-gold); }
 .btn.danger { color: var(--bad); }
 .btn:disabled { border-color: var(--faded-line); box-shadow: 3px 3px 0 var(--faded-line); color: var(--faded); cursor: default; }
-.btn.hero { min-height: 56px; font-size: 18px; margin-bottom: 14px; }
-.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px; }
-.pair .btn { margin: 0; }
+main > .btn, .recipe-form > .btn { margin-bottom: 14px; }
 
-/* Next Kindergeld payment */
-.next { display: flex; align-items: center; gap: 12px; }
-.next > .icon { font-size: 26px; }
-.next > span { flex: 1; }
-
-/* Reminder to back up */
-.banner { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 15px; font-weight: 700; text-decoration: none; background: var(--gold); color: var(--on-gold); }
+/* What keeps the data from reaching the other phone */
+.banner { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; margin-bottom: 16px; font-size: 15px; font-weight: 700; text-align: left; text-decoration: none; background: var(--gold); color: var(--on-gold); cursor: pointer; }
 .banner span { flex: 1; }
-button.banner { width: 100%; font-family: inherit; text-align: left; cursor: pointer; }
-
-/* Section headings with an action */
-.section { display: flex; align-items: center; gap: 10px; margin: 8px 0 10px; }
-.section h2 { flex: 1; font: 700 15px var(--display); }
-.section .icon-btn { margin: -8px -10px -8px 0; }
-
-/* Lists of entries */
-.list { padding: 0 16px; }
-.list ul { list-style: none; margin: 0; padding: 0; }
-.list li + li { border-top: 2px solid var(--faded-line); }
-.line { display: flex; width: 100%; align-items: center; gap: 12px; min-height: 56px; padding: 10px 0; border: 0; background: none; text-align: left; cursor: pointer; }
-.line .name { flex: 1; min-width: 0; }
-.line b { font-weight: 600; }
-.line .day { flex: none; width: 2.2em; font-weight: 700; font-variant-numeric: tabular-nums; }
-.line.done { color: var(--faded); }
-.line.done b, .line.done .amount { text-decoration: line-through; }
-.badge { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: 6px; background: var(--ink); color: var(--bg); font-size: 13px; font-weight: 700; }
-.empty { color: var(--muted); font-size: 15px; padding: 14px 0; margin: 0; }
-
-/* Month switcher */
-.month-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-.month-nav span { flex: 1; text-align: center; font: 700 17px var(--display); }
-.month-nav .icon-btn { margin: 0; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--surface); }
-.month-nav .icon-btn:disabled { border-color: var(--faded-line); color: var(--faded); cursor: default; }
-
-/* Budget: one bar, salary split into fixed costs (ink), planned (gold) and what is left */
-.split { display: flex; height: 16px; margin: 4px 0 10px; border: 2px solid var(--ink); border-radius: 99px; overflow: hidden; background: var(--surface); }
-.split .fixed { background: var(--ink); }
-.split .planned { background: var(--gold); }
-.split .planned:not(:first-child) { border-left: 2px solid var(--ink); }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; color: var(--muted); }
-.legend i { display: inline-block; width: 12px; height: 12px; margin-right: 6px; border: 2px solid var(--ink); border-radius: 3px; vertical-align: -1px; }
-.legend .fixed { background: var(--ink); }
-.legend .planned { background: var(--gold); }
-
-/* Budget: the Rücklage covers what goes beyond the salary (hatched); what it can't cover is red. */
-.split .reserve { background: repeating-linear-gradient(135deg, var(--gold) 0 4px, var(--surface) 4px 8px); border-left: 2px dashed var(--ink); }
-.split .uncovered { background: var(--bad); border-left: 2px solid var(--ink); }
-.legend .reserve { background: repeating-linear-gradient(135deg, var(--gold) 0 3px, var(--surface) 3px 6px); }
-.status { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 3px 12px; border: 2px solid var(--ink); border-radius: 99px; font-size: 14px; font-weight: 700; }
-.status.covered { background: var(--gold); color: var(--on-gold); }
-.status.uncovered { background: var(--bad); color: var(--on-state); border-color: var(--bad); }
-.reserve-card { display: flex; align-items: center; gap: 12px; }
-.reserve-card > .icon:first-child { font-size: 26px; }
-.reserve-card > span:first-of-type { flex: 1; min-width: 0; }
-.reserve-card.empty { border-style: dashed; box-shadow: none; }
-.reserve-amount { text-align: right; }
-.reserve-amount small { white-space: nowrap; }
-.sheet-hint { margin: -4px 0 16px; }
-
-/* Statistics: ranked bars in one colour */
-.segmented { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 16px; border: 2px solid var(--ink); border-radius: var(--radius); overflow: hidden; box-shadow: 3px 3px 0 var(--ink); }
-.segmented.two { grid-template-columns: repeat(2, 1fr); }
-.segmented button { min-height: 44px; border: 0; background: var(--surface); font-weight: 700; cursor: pointer; }
-.segmented button + button { border-left: 2px solid var(--ink); }
-.segmented button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
-.bars { display: grid; gap: 12px; }
-.bar-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; font-size: 15px; }
-.bar-row .track { grid-column: 1 / -1; height: 12px; }
-.bar-row .track > div { height: 100%; min-width: 3px; border-radius: 99px; background: var(--ink); }
-.months { display: grid; margin-top: 12px; grid-template-columns: 2.6em 1fr auto; gap: 6px 10px; align-items: center; font-size: 14px; }
-.months .pair-bars { display: grid; gap: 3px; }
-.months .pair-bars > div { height: 8px; min-width: 0; border-radius: 99px; }
-.months .in, .legend .in { background: var(--ink); }
-.months .out { border: 2px solid var(--ink); background: var(--surface); }
-.months .amount { text-align: right; }
-
-/* Settings */
-.setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
-.setting + .setting { border-top: 2px solid var(--faded-line); padding-top: 12px; margin-top: 12px; }
-.stepper { display: flex; align-items: center; gap: 4px; }
-.stepper output { min-width: 2ch; text-align: center; font: 700 18px var(--display); }
-.stepper .icon-btn { margin: 0; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--surface); }
-.stepper .icon-btn:disabled { border-color: var(--faded-line); color: var(--faded); cursor: default; }
-.setting select { min-height: 44px; min-width: 5em; padding: 6px 10px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--surface); }
-.card .setting + .btn, .card .hint + .btn { margin-top: 16px; }
-/* An email address or user id may break anywhere; one tap selects the id for copying. */
-.account { min-width: 0; overflow-wrap: anywhere; text-align: right; }
-.hint code { overflow-wrap: anywhere; user-select: all; }
-.card .btn + .btn { margin-top: 14px; }
 
 /* Forms */
 .field { display: block; margin-bottom: 14px; }
 .field > span { display: block; margin-bottom: 4px; font-size: 14px; font-weight: 700; }
-.field input, .field select { width: 100%; min-height: 48px; padding: 10px 14px; }
-.field input:focus, .field select:focus, .setting select:focus { outline: 3px solid var(--gold); outline-offset: 1px; }
-.field .error { color: var(--bad); font-size: 14px; margin-top: 4px; }
-.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.field input, .field textarea { width: 100%; min-height: 48px; padding: 10px 14px; }
+.field textarea { resize: vertical; }
+.field input:focus, .field textarea:focus, .search:focus-within { outline: 3px solid var(--gold); outline-offset: 1px; }
+.add-line { display: grid; grid-template-columns: 1fr 52px; gap: 10px; align-items: end; margin-bottom: 4px; }
+.add-line .field { margin-bottom: 14px; }
+.add-line .btn { width: 52px; padding: 0; margin-bottom: 14px; }
 
-/* Dialogs and sheets */
-.modal { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, .55); }
-.modal-box { width: 100%; max-width: 400px; padding: 20px; }
-.modal-box > p { margin: 0 0 4px; font-size: 18px; font-weight: 700; }
-.nav { display: flex; gap: 14px; margin-top: 20px; }
-.nav .btn { margin: 0; }
-/* Near the top, so the phone's keyboard doesn't cover the form. */
-.sheet-backdrop { align-items: start; padding-top: max(24px, env(safe-area-inset-top)); overflow-y: auto; }
-.sheet-head { align-items: center; margin: -6px 0 12px; }
-.sheet-head h2 { font: 700 18px var(--display); }
-.sheet-head .icon-btn { margin: 0 -10px 0 0; }
-.sheet .btn + .btn { margin-top: 14px; }
+/* ⋯ menus */
+.more { position: relative; }
+.more > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius); list-style: none; cursor: pointer; font-size: 22px; }
+.more > summary::-webkit-details-marker { display: none; }
+.more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  display: grid;
+  min-width: 220px;
+  padding: 6px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.more-menu > a, .more-menu > button {
+  display: block;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.more-menu > :hover:not(:disabled) { background: var(--bg); }
+.more-menu > :disabled { color: var(--faded); cursor: default; }
+.more-menu .danger { color: var(--bad); }
+
+/* Main pages: a header of their own instead of the top bar */
+.page-head { margin: 0 0 16px; }
+.page-head h1 { font-size: 28px; line-height: 1.15; }
+.status-row, .title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+.status-row .icon-btn { margin: 0 -10px 0 auto; }
+.sync-line { color: var(--muted); font-size: 13px; }
+.page-head .muted { margin: 4px 0 0; }
+
+/* Recipes: tiles, the recipe's own colour when it has no photo */
+.search { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; margin-bottom: 18px; }
+.search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 16px; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 16px; margin: 0 0 24px; padding: 0; list-style: none; }
+.tile { display: grid; gap: 2px; text-decoration: none; }
+.tile b { margin-top: 8px; font-weight: 700; line-height: 1.25; }
+.tile .muted { font-size: 13px; }
+.cover {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: 3px 3px 0 var(--ink);
+  object-fit: cover;
+  font: 700 40px/1 var(--display);
+  transition: transform 100ms ease-out, box-shadow 100ms ease-out;
+}
+.tile-0 { background: var(--gold); color: var(--on-gold); }
+.tile-1 { background: var(--ink); color: var(--gold); }
+.tile-2 { background: var(--surface); color: var(--text); }
+@media (prefers-color-scheme: dark) { .tile-1 { color: var(--bg); } }
+.cover.placeholder { align-items: center; justify-content: center; background: var(--surface); color: var(--muted); font: 15px var(--font); text-align: center; }
+
+/* Start page: the shopping list and a new recipe, always within reach */
+.dock { position: sticky; bottom: calc(var(--tabbar) + 12px + env(safe-area-inset-bottom)); display: flex; gap: 12px; align-items: center; }
+.list-bar { display: flex; flex: 1; align-items: center; gap: 10px; min-height: 56px; padding: 0 16px; border-radius: var(--radius); background: var(--ink); color: var(--bg); font-weight: 700; text-decoration: none; }
+.list-bar span:first-of-type { flex: 1; }
+.list-bar .count { padding: 2px 8px; border-radius: 6px; background: var(--gold); color: var(--on-gold); font-size: 14px; }
+.fab { display: grid; place-items: center; flex: none; width: 56px; height: 56px; border: 2px solid var(--ink); border-radius: 16px; background: var(--gold); color: var(--on-gold); box-shadow: 3px 3px 0 var(--ink); font-size: 24px; }
+
+/* Recipe page: the picture first, the main actions at the bottom */
+.hero { position: relative; margin: -18px calc(-1 * max(16px, env(safe-area-inset-left))) 18px; }
+.hero .cover { aspect-ratio: 4 / 3; border-width: 0 0 2px; border-radius: 0; box-shadow: none; padding: 20px; justify-content: flex-end; font-size: 120px; }
+.round-btn, .more.on-hero > summary { width: 44px; height: 44px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--surface); }
+.round-btn { position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 12px; display: grid; place-items: center; font-size: 20px; }
+.more.on-hero { position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 12px; }
+.recipe-title { font-size: 26px; line-height: 1.15; margin-bottom: 16px; }
+main h2.display { font-size: 16px; margin: 22px 0 10px; }
+.servings { display: flex; align-items: center; justify-content: space-between; }
+.stepper { display: flex; align-items: center; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--surface); }
+.stepper .icon-btn { margin: 0; }
+.stepper .icon-btn:disabled { color: var(--faded); cursor: default; }
+.stepper output { min-width: 7.5em; text-align: center; font-weight: 700; }
+.ingredients { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.ingredient { display: grid; grid-template-columns: 5.5em 1fr; gap: 12px; }
+.ingredient .amount { font-weight: 700; text-align: right; }
+.steps { margin: 0 0 16px; padding-left: 1.6em; }
+.steps li { margin-bottom: 12px; padding-left: 4px; white-space: pre-line; }
+.steps li::marker { font: 700 15px var(--display); }
+.notes { white-space: pre-line; margin: 0 0 16px; }
+.action-bar .btn { padding: 12px 8px; gap: 6px; white-space: nowrap; }
+.action-bar {
+  position: sticky;
+  bottom: calc(var(--tabbar) + 12px + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* Cooking: one step, large, the screen kept on */
+.cook-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cook-head .icon-btn { margin: 0 -10px 0 0; }
+.progress { display: flex; gap: 6px; margin: 6px 0 32px; }
+.progress span { flex: 1; height: 8px; border: 2px solid var(--faded-line); border-radius: 4px; }
+.progress .done { border-color: var(--ink); background: var(--ink); }
+.progress .now { border-color: var(--ink); background: var(--gold); }
+.step-count { font-size: 15px; margin: 0 0 20px; }
+.step-text { margin: 0 0 28px; font-size: 28px; line-height: 1.3; font-weight: 600; white-space: pre-line; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 24px; padding: 0; list-style: none; }
+.chips li { padding: 6px 14px; border: 2px solid var(--ink); border-radius: 99px; background: var(--surface); font-weight: 600; }
+.cook-nav { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+
+/* Recipe form: lines read from one line of text */
+.edit-lines { padding: 0 4px 0 16px; }
+.edit-lines li { display: flex; align-items: center; }
+.line { display: flex; flex: 1; width: 100%; align-items: center; gap: 12px; min-height: 52px; padding: 10px 0; border: 0; background: none; text-align: left; text-decoration: none; cursor: pointer; }
+.line .name { flex: 1; min-width: 0; }
+.edit-lines .amount { min-width: 4.5em; font-weight: 700; }
+.photo { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; margin-bottom: 14px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--surface); }
+.photo.placeholder { display: grid; place-items: center; color: var(--muted); font-size: 15px; }
+.photo-edit label.btn { cursor: pointer; }
+.photo-edit .btn + .btn { margin-top: 14px; }
+
+/* Shopping list */
+.shopping-card { padding: 4px 16px; }
+.shopping { list-style: none; margin: 0; padding: 0; }
+.shopping li + li { border-top: 1px solid var(--faded-line); }
+.shopping-line .tick { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 2px solid var(--ink); border-radius: 7px; font-weight: 700; }
+.shopping-line b { font-weight: 600; }
+.shopping-line .amount { flex: none; font-weight: 700; text-align: right; }
+.shopping-line .for { display: block; color: var(--muted); font-size: 13px; }
+.shopping-line.done { color: var(--faded); }
+.shopping-line.done b, .shopping-line.done .amount { text-decoration: line-through; }
+.shopping-line.done .tick { background: var(--gold); color: var(--on-gold); }
+.in-trolley { margin: 10px 0 0; padding-top: 10px; border-top: 2px solid var(--ink); font-size: 14px; }
+.shopping-card > .in-trolley:first-child { margin-top: 6px; padding-top: 0; border-top: 0; }
+
+/* Settings (account page) */
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
+.setting + .setting { border-top: 1px solid var(--faded-line); padding-top: 12px; margin-top: 12px; }
+.card .setting + .btn, .card .hint + .btn { margin-top: 16px; }
+.card .btn + .btn { margin-top: 14px; }
+/* An email address or user id may break anywhere; one tap selects the id for copying. */
+.account { min-width: 0; overflow-wrap: anywhere; text-align: right; }
+.hint code { overflow-wrap: anywhere; user-select: all; }
 
 #blazor-error-ui {
   display: none;
@@ -283,43 +324,5 @@ button.banner { width: 100%; font-family: inherit; text-align: left; cursor: poi
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn, button.card, a.card, .card.tappable { transition: none; }
+  .btn, .cover { transition: none; }
 }
-
-/* Recipes */
-.ingredients li { display: flex; gap: 12px; align-items: baseline; padding: 10px 0; }
-.ingredients .amount { flex: none; min-width: 5.5em; font-weight: 700; text-align: right; }
-.steps { margin: 0 0 16px; padding-left: 1.6em; }
-.steps li { margin-bottom: 12px; padding-left: 4px; white-space: pre-line; }
-.steps li::marker { font: 700 15px var(--display); }
-.notes { white-space: pre-line; margin: 0 0 16px; }
-main > .btn { margin-bottom: 14px; }
-.line-edit { border-width: 2px; margin: 0 0 14px; }
-.line-edit .btn { min-height: 40px; padding: 6px 12px; }
-.amount-unit { display: grid; grid-template-columns: 1fr 6.5em; gap: 0 12px; }
-.field textarea { width: 100%; padding: 10px 14px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--surface); font: inherit; color: inherit; resize: vertical; }
-.field textarea:focus { outline: 3px solid var(--gold); outline-offset: 1px; }
-.recipe-form > .btn { margin-bottom: 14px; }
-.error { color: var(--bad); font-weight: 700; }
-a.line { color: inherit; text-decoration: none; }
-
-/* Tab bar labels: emoji icons, no icon font */
-.tab-icon { font-size: 20px; line-height: 1; }
-
-/* Shopping */
-.add-by-hand { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; align-items: end; margin: 14px 0 4px; }
-.add-by-hand .btn { width: auto; margin-bottom: 14px; }
-.shopping-line .tick, .choice .tick { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--ink); border-radius: 8px; font-weight: 700; }
-.shopping-line.done .tick { background: var(--gold); color: var(--on-gold); }
-.shopping-line .amount { flex: none; font-weight: 700; text-align: right; }
-.shopping-line .for { display: block; color: var(--muted); font-size: 13px; }
-.choice { display: flex; align-items: center; gap: 8px; }
-.choice .line { flex: 1; }
-
-/* Photos */
-.photo { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; margin-bottom: 16px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--surface); }
-.thumb { flex: none; width: 48px; height: 48px; object-fit: cover; border: 2px solid var(--ink); border-radius: 8px; background: var(--surface); }
-.placeholder { display: grid; place-items: center; color: var(--muted); font-size: 15px; }
-.photo-edit .photo { margin-bottom: 14px; }
-.photo-edit label.btn { cursor: pointer; }
-.photo-edit .btn + .btn { margin-top: 14px; }

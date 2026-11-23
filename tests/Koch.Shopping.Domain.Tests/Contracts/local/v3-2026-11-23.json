@@ -1,0 +1,80 @@
+{
+  "schema": 3,
+  "book": {
+    "items": [
+      {
+        "id": "22222222-2222-2222-2222-000000000001",
+        "name": "Kartoffeln",
+        "amount": {
+          "value": 500,
+          "unit": "g"
+        },
+        "checked": true,
+        "recipe": "Kartoffelsuppe"
+      },
+      {
+        "id": "22222222-2222-2222-2222-000000000002",
+        "name": "Salz",
+        "amount": null,
+        "checked": false,
+        "recipe": "Kartoffelsuppe"
+      },
+      {
+        "id": "22222222-2222-2222-2222-000000000003",
+        "name": "Milch",
+        "amount": null,
+        "checked": false,
+        "recipe": null
+      }
+    ]
+  },
+  "sync": {
+    "at": "2026-11-22T18:30:00+00:00",
+    "base": {
+      "items": [
+        {
+          "id": "22222222-2222-2222-2222-000000000001",
+          "name": "Kartoffeln",
+          "amount": {
+            "value": 500,
+            "unit": "g"
+          },
+          "checked": false,
+          "recipe": "Kartoffelsuppe"
+        },
+        {
+          "id": "22222222-2222-2222-2222-000000000002",
+          "name": "Salz",
+          "amount": null,
+          "checked": false,
+          "recipe": "Kartoffelsuppe"
+        },
+        {
+          "id": "22222222-2222-2222-2222-000000000003",
+          "name": "Milch",
+          "amount": null,
+          "checked": false,
+          "recipe": null
+        }
+      ]
+    }
+  },
+  "unconfirmed": {
+    "protocol": 3,
+    "items": {
+      "changed": [
+        {
+          "id": "22222222-2222-2222-2222-000000000001",
+          "name": "Kartoffeln",
+          "amount": {
+            "value": 500,
+            "unit": "g"
+          },
+          "checked": true,
+          "recipe": "Kartoffelsuppe"
+        }
+      ],
+      "removed": []
+    }
+  }
+}

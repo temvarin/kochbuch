@@ -34,6 +34,7 @@ kassensturz stores each synced document as one row. A recipe book holds many rec
 - A lost update is still possible when both phones edit the same recipe between syncs. Accepted for now. Phase 7 plans
   a three-way merge per recipe part (title, each line, each step), with the base taken from temporal history
   (`notes/offline-sync-conflict-resolution.md`).
+  - **The ingredient catalogue was removed by ADR-0013;** ingredient identity from the name (`IngredientKey`) stays.
   - **Superseded in part by ADR-0012:** recipes are now merged part by part, with the base sent by the phone (protocol
     3). Last arrival wins only within one part.
 - Every sync answer is the whole book. That is fine for a household (hundreds of recipes, well under 1 MB); paging or
@@ -43,7 +44,7 @@ kassensturz stores each synced document as one row. A recipe book holds many rec
 ## Compliance
 - `tests/Koch.Recipes.Domain.Tests/SyncTests`: convergence over 200 random histories of three phones (edits, removals,
   lost answers, requests that never arrive), lost answers, offline-added ingredients ending up once, last arrival wins.
-- `tests/Koch.Recipes.Tests/RecipeStoreTests`: the same contract for SQL and memory (tombstones, unchanged writes,
+- `tests/Koch.Recipes.Tests/DocumentRowsTests`: the same contract for SQL and memory (tombstones, unchanged writes,
   rollback of a failing request). `SyncApiTests`: 415 / 400 / 409, idempotency.
 - `tests/Koch.App.Tests`: real pages against the real service in memory, with a lost answer and with offline-then-online.
 - Contract samples (`tests/*/Contracts`): local storage, sync request and response, rows. This check found a real bug on

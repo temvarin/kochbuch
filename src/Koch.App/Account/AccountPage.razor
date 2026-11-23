@@ -44,24 +44,7 @@
 }
 
 @code {
-    private string StatusText => Sync.Status switch
-    {
-        SyncStatus.Syncing => "läuft …",
-        SyncStatus.Failed => "fehlgeschlagen, neuer Versuch gleich",
-        SyncStatus.Outdated => "neue Version – bitte neu laden",
-        SyncStatus.Refused => "abgelehnt – bitte neu laden",
-        _ when Sync.HasUnsyncedChanges => "Änderungen warten",
-        _ when Sync.LastSync is { } last => $"zuletzt {Since(last)}",
-        _ => "noch nie",
-    };
-
-    private string Since(DateTimeOffset last) => (Clock.GetUtcNow() - last) switch
-    {
-        { TotalMinutes: < 1 } => "gerade eben",
-        { TotalHours: < 1 } ago => $"vor {(int)ago.TotalMinutes} Min.",
-        { TotalDays: < 1 } ago => $"vor {(int)ago.TotalHours} Std.",
-        var ago => $"vor {(int)ago.TotalDays} Tagen",
-    };
+    private string StatusText => Sync.Describe(Clock.GetUtcNow());
 
     private void SignIn() => Nav.NavigateTo(AccountService.SignInUrl, forceLoad: true);
 }

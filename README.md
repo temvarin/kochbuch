@@ -12,8 +12,9 @@ The fourth app in the series after 33-von-33, fallstrick and kassensturz. This o
 >
 > Working:
 > - recipes with photos, ingredients and steps, scaled to any number of servings, offline, synced between both phones
-> - shopping lists from chosen recipes with matching ingredients added up (500 g + 300 g = 800 g), by aisle, ticked off on
->   both phones
+> - one shopping list: a recipe goes onto it from its page, matching ingredients add up (500 g + 300 g = 800 g),
+>   ticked off on both phones
+> - a cooking view, one step per screen with the screen kept on; ingredients typed as one line, "500 g Kartoffeln"
 > - photos: uploaded straight from the phone to Blob Storage, turned into WebP renditions by an Azure Function (camera
 >   metadata and GPS position removed), served by the gateway and kept offline by the service worker
 > - photo clean-up: Recipes publishes "attached"/"detached" through a transactional outbox, and Media deletes photos no
@@ -83,29 +84,47 @@ sequenceDiagram
 | Service Bus Basic queues, no topics; Event Grid for storage events | [0007](docs/adr/0007-service-bus-basic.md) |
 | Photo clean-up: transactional outbox, events ordered by sequence, blob tags, daily sweep | [0008](docs/adr/0008-outbox-and-photo-lifecycle.md) |
 | Observability: OpenTelemetry into Application Insights, one trace across the outbox, three alerts, staged gateway releases | [0009](docs/adr/0009-observability-alerts-and-staged-releases.md) |
+| Easy Auth signs in with a federated managed identity, a client secret as fallback; no Key Vault (proposed until the first deploy) | [0010](docs/adr/0010-sign-in-credential.md) |
+| Cost model for Azure for Students; the Azure services and tools deliberately not used, Aspire included | [0011](docs/adr/0011-cost-model-and-what-is-not-used.md) |
 | Concurrent recipe edits merged part by part with the phone's base; browser tests of the household; no topic yet | [0012](docs/adr/0012-recipe-merge-and-browser-tests.md) |
+| No shop aisles, and so no ingredient catalogue: lists show open items by name | [0013](docs/adr/0013-no-aisles-no-ingredient-catalogue.md) |
+| The UI: photo first, one shopping list, cooking view, ingredients typed as one line | [0014](docs/adr/0014-ui-photo-first-one-list.md) |
 
 ### Projects
+Read from the outside in: what runs, what the runnables share, then tests and infrastructure.
+
 | Project | What |
 |---|---|
-| `src/Koch.App` | Blazor WebAssembly PWA, German UI, hand-written CSS |
-| `src/Koch.Gateway` | The only public app: Easy Auth handler, Member policy, YARP proxy, security headers, hosts the PWA |
-| `src/Koch.Recipes` | Recipes service: `POST /sync`; `Storage/` is the only code that talks to SQL; `Outbox/` relays photo events to Service Bus |
-| `src/Koch.Shopping` | Shopping service: `POST /sync` for lists and their items |
-| `src/Koch.Shopping.Domain` | Pure list rules shared by the app and the service: combining amounts, lines, ticking, sync |
+| **Deployables** | |
+| `src/Koch.App` | Blazor WebAssembly PWA, German UI, hand-written CSS; served by the gateway. `Recipes/` (tiles, recipe page, cooking view, form with `IngredientText`), `Shopping/` (the one list), `Sync/`, `Shell/` |
+| `src/Koch.Gateway` | The only public app: Easy Auth handler, Member policy, YARP proxy, security headers, photo upload links and serving |
+| `src/Koch.Recipes` | Recipes service: `POST /sync`; `Storage/` maps the book to rows; `Outbox/` relays photo events to Service Bus |
+| `src/Koch.Shopping` | Shopping service: `POST /sync` for the list's items |
 | `src/Koch.Media` | Azure Function (Flex Consumption): turns uploads into renditions, applies photo events as blob tags, sweeps detached photos daily |
-| `src/Koch.Media.Imaging` | Pure photo work: validate, turn upright, WebP at 400 and 1200 px, nothing of the original kept |
-| `src/Koch.Kernel` | Shared vocabulary and sync abstractions: units, quantities, aisles, `Synced<TBook, TChanges>` |
-| `src/Koch.Recipes.Domain` | Pure rules shared by the app and the service: recipes, quantities, catalogue, sync (ported from kassensturz), local store |
-| `src/Koch.*.Contracts`, `src/Koch.Recipes.Events` | One small library per producer and purpose: what others compile against, nothing else |
-| `src/Koch.ServiceDefaults` | Hosting plumbing every service shares: the forwarded user, the synced rows in SQL with their outbox |
-| `src/Koch.Telemetry` | How the HTTP apps report: OpenTelemetry into Application Insights, every trace kept, health probes left out |
-| `tools/Koch.DbDeploy` | Applies `db/<service>/*.sql` in CI with Entra auth |
-| `tools/Koch.DevPhotos` | Development only: prepares Azurite and processes uploads the way Event Grid + Media do in Azure (no photo events: locally they stay in `recipes.Outbox`) |
-| `tests/*` | Domain (rules, randomized multi-phone sync, contract samples), Recipes (store contract on SQL and memory, sync API, row samples), App (bUnit pages against the real service in memory, lost answers, offline), Gateway (auth, proxy, spoofed headers), Media (renditions, photo events, traces), Architecture (boundaries, KQL checked against the tables) |
-| `tests/Koch.E2E` | Playwright: the real gateway and app on a real port, the services in memory, Anna's and Ben's phones as two browser contexts; axe accessibility checks |
-| `infra/` | Bicep: observability with saved queries, identities, Container Apps environment, apps (the gateway in staged revisions), Easy Auth config, photos, messaging, alerts, budget alarm |
+| **Rules, shared by the app and a service** | |
+| `src/Koch.Kernel` | Shared vocabulary and sync machinery: units, quantities, `Synced<TBook, TChanges>` |
+| `src/Koch.Recipes.Domain` | Recipes, ingredient identity (`IngredientKey`), the sync book and its merge (`RecipeMerge`), the phone's local store |
+| `src/Koch.Shopping.Domain` | The shopping list: contributions, combining amounts, lines, ticking, sync |
+| `src/Koch.Media.Imaging` | Photo work: validate, turn upright, WebP at 400 and 1200 px, nothing of the original kept |
+| **Contracts: what one deployable publishes for others** | |
+| `src/Koch.*.Contracts`, `src/Koch.Recipes.Events` | One small library per producer and purpose (Clean Code ch20, CRP): wire shapes, the photo path layout, photo events |
+| **Hosting plumbing** | |
+| `src/Koch.ServiceDefaults` | What every service shares: the forwarded user, the synced rows in SQL with their outbox |
+| `src/Koch.Telemetry` | How the HTTP apps report: OpenTelemetry into Application Insights |
+| **Tools** | |
+| `tools/Koch.DbDeploy` | Applies `db/<service>/*.sql`, locally and in CI |
+| `tools/Koch.DevPhotos` | Development only: prepares Azurite and processes uploads the way Event Grid and Media do in Azure |
+| **Tests** | |
+| `tests/Koch.*.Domain.Tests` | Rules, randomized multi-phone sync, the merge, contract samples of local storage and the sync API |
+| `tests/Koch.Recipes.Tests`, `tests/Koch.Shopping.Tests` | The services: row store contract on SQL and memory, sync API, outbox, events, row samples |
+| `tests/Koch.App.Tests`, `tests/Koch.Gateway.Tests`, `tests/Koch.Media.Tests` | bUnit pages against the real service in memory; auth, proxy and spoofed headers; renditions and photo events |
+| `tests/Koch.Architecture.Tests` | Which project may use which, KQL checked against the tables, every path and ADR cited in docs and comments exists |
+| `tests/Koch.E2E` | Playwright: the real gateway and app on a real port, the services in memory, two phones as two browser contexts, axe checks |
+| `tests/Koch.Testing` | Test helpers shared by the test projects: the memory row store |
+| **Infrastructure and data** | |
+| `infra/` | Bicep: observability with saved queries, identities, Container Apps environment, apps (the gateway in staged revisions), Easy Auth, photos, messaging, alerts, budget alarm |
 | `infra/queries` | KQL: one trace end to end, failures, latency percentiles, photo events, outbox relay, ingestion against the cap |
+| `db/` | Idempotent SQL per service schema; `db/manual/grants.sql` once by hand |
 
 ## Development
 Needs the .NET 10 SDK (`global.json`) and SQL Server LocalDB (kassensturz's dev database `Kassensturz`).

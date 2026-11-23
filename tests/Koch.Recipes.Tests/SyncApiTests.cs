@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Koch.Gateway.Contracts;
-using Koch.Kernel;
 using Koch.Kernel.Measures;
 using Koch.Recipes.Contracts;
 using Koch.Recipes.Domain.Cooking;
@@ -53,7 +52,7 @@ public sealed class SyncApiTests(WebApplicationFactory<Program> factory) : IClas
     }
 
     [Fact]
-    public async Task A_saved_recipe_and_its_ingredients_come_back_to_the_next_phone()
+    public async Task A_saved_recipe_comes_back_to_the_next_phone()
     {
         var service = Service();
         await Post(service, Saved(Soup()).ToJson());
@@ -61,7 +60,6 @@ public sealed class SyncApiTests(WebApplicationFactory<Program> factory) : IClas
         var book = await Book(await Post(service, BookChanges.None.ToJson()));
 
         Assert.Equal(Soup(), Assert.Single(book.Recipes));
-        Assert.Equal("Kartoffeln", Assert.Single(book.Ingredients).Name);
     }
 
     [Fact]
@@ -71,7 +69,7 @@ public sealed class SyncApiTests(WebApplicationFactory<Program> factory) : IClas
         await Post(service, Saved(Soup()).ToJson());
 
         var book = await Book(await Post(service,
-            new BookChanges(new([], [SoupId]), ItemChanges.None<Koch.Recipes.Domain.Catalog.Ingredient>()).ToJson()));
+            new BookChanges(new([], [SoupId])).ToJson()));
 
         Assert.Empty(book.Recipes);
     }

@@ -59,7 +59,7 @@ public class PhotoEventTests
     }
 
     [Fact]
-    public void Ingredients_cause_no_event() =>
+    public void Rows_that_are_not_recipes_cause_no_event() => // ingredient rows from before docs/adr/0013
         Assert.Empty(Rows.PhotoEvents(new RowChange("ingredient:x", null, """{"name":"Salz","aisle":"sonstiges"}""")));
 }
 

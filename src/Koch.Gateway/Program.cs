@@ -22,7 +22,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
-// For the platform's probes. Container Apps' Easy Auth lets it through: infra/modules/gateway.bicep excludes the path.
+// For the platform's probes. Easy Auth lets every request through (AllowAnonymous, infra/modules/gatewayAuth.bicep),
+// so the probe needs no sign-in.
 app.MapHealthChecks("/healthz");
 
 app.MapWhoAmI();

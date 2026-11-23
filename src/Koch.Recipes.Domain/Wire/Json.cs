@@ -1,6 +1,4 @@
 using Koch.Recipes.Contracts;
-using Koch.Recipes.Domain.Catalog;
-using Koch.Kernel;
 using Koch.Kernel.Measures;
 using Koch.Recipes.Domain.Cooking;
 using Koch.Recipes.Domain.Sync;
@@ -23,15 +21,10 @@ public static class Json
 
     public static Quantity ToDomain(this QuantityJson json) => new(json.Value, Units.FromCode(json.Unit));
 
-    public static IngredientJson ToJson(this Ingredient ingredient) => new(ingredient.Name, ingredient.Aisle.Code());
-
-    public static Ingredient ToDomain(this IngredientJson json) => new(json.Name, Aisles.FromCode(json.Aisle));
-
-    /// <param name="bases">The changed recipes as the phone last got them (<see cref="SyncedBook.BasesFor"/>).</param>
+    /// <param name="bases">The changed recipes as the phone last got them (<see cref="BookChanges.BasesIn"/>).</param>
     public static SyncRequestJson ToJson(this BookChanges changes, IReadOnlyList<Recipe>? bases = null) => new(SyncRequestJson.CurrentProtocol,
         new([.. changes.Recipes.Changed.Select(ToJson)], changes.Recipes.Removed,
-            bases is { Count: > 0 } ? [.. bases.Select(ToJson)] : null),
-        new([.. changes.Ingredients.Changed.Select(ToJson)], changes.Ingredients.Removed));
+            bases is { Count: > 0 } ? [.. bases.Select(ToJson)] : null));
 
     /// <summary>The bases a phone sent with its changed recipes.</summary>
     /// <exception cref="ArgumentException">A base breaks a rule, appears twice, or belongs to no changed recipe.</exception>
@@ -47,18 +40,13 @@ public static class Json
     /// <exception cref="ArgumentException">An item breaks a rule, or appears twice.</exception>
     public static BookChanges ToDomain(this SyncRequestJson json)
     {
-        var changes = new BookChanges(
-            new([.. json.Recipes.Changed.Select(ToDomain)], json.Recipes.Removed),
-            new([.. json.Ingredients.Changed.Select(ToDomain)], json.Ingredients.Removed));
-        if (changes.Recipes.Changed.DistinctBy(r => r.Id).Count() != changes.Recipes.Changed.Count
-            || changes.Ingredients.Changed.DistinctBy(i => i.Id).Count() != changes.Ingredients.Changed.Count)
-            throw new ArgumentException("An item appears twice among the changes.");
+        var changes = new BookChanges(new([.. json.Recipes.Changed.Select(ToDomain)], json.Recipes.Removed));
+        if (changes.Recipes.Changed.DistinctBy(r => r.Id).Count() != changes.Recipes.Changed.Count)
+            throw new ArgumentException("A recipe appears twice among the changes.");
         return changes;
     }
 
-    public static SyncResponseJson ToJson(this RecipeBook book) =>
-        new([.. book.Recipes.Select(ToJson)], [.. book.Ingredients.Select(ToJson)]);
+    public static SyncResponseJson ToJson(this RecipeBook book) => new([.. book.Recipes.Select(ToJson)]);
 
-    public static RecipeBook ToDomain(this SyncResponseJson json) =>
-        new(json.Recipes.Select(ToDomain), json.Ingredients.Select(ToDomain));
+    public static RecipeBook ToDomain(this SyncResponseJson json) => new(json.Recipes.Select(ToDomain));
 }

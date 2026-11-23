@@ -2,6 +2,8 @@
 @inject Browser Browser
 @inject SyncOverview Sync
 
+@* Pages with a back arrow fill the top bar; the main pages and the recipe page bring their own header, and it stays
+   empty and hidden (styles.css). *@
 <header class="topbar">
     <SectionOutlet SectionName="@TopBar.Section" />
 </header>
@@ -9,8 +11,8 @@
     @Body
 </main>
 <nav class="tabbar" aria-label="Bereiche">
-    <NavLink href="" Match="NavLinkMatch.All"><span class="tab-icon" aria-hidden="true">📖</span>Rezepte</NavLink>
-    <NavLink href="einkauf"><span class="tab-icon" aria-hidden="true">🛒</span>Einkauf</NavLink>
+    <NavLink href="" Match="NavLinkMatch.All"><span class="tab-icon"><Icon Name="book" /></span>Rezepte</NavLink>
+    <NavLink href="einkauf"><span class="tab-icon"><Icon Name="cart" /></span>Einkauf</NavLink>
 </nav>
 
 @code {

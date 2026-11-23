@@ -9,7 +9,8 @@ version writes exactly the newest sample and still reads every older one. Ported
 | `local` | the app, in localStorage | the app, after an update | `BookStore.Schema` |
 | `sync-request` | the app | the service | `SyncRequestJson.CurrentProtocol` |
 | `sync-response` | the service | the app | the protocol |
-| `row-recipe`, `row-ingredient` (Koch.Recipes.Tests) | the service | the service, any later version: rows are never migrated | none: only additive changes |
+| `row-recipe` (Koch.Recipes.Tests) | the service | the service, any later version: rows are never migrated | none: only additive changes |
+| `row-ingredient` (Koch.Recipes.Tests) | the service until ADR-0013 | nobody: such rows stay in the table, ignored | – |
 
 ## Rules
 - **Never edit a sample** that was released. A test fails with `received.json` next to the sample when the written
@@ -19,5 +20,7 @@ version writes exactly the newest sample and still reads every older one. Ported
 - Protocol 3 (2026-11-22) adds `recipes.bases`: changed recipes as the phone last got them, which the service merges
   with (docs/adr/0012). Left out when there are none. The local store keeps unanswered changes as a request, so it
   moved to schema 3 with it.
+- Protocol 4 (2026-11-22) drops `ingredients`, the catalogue with aisles (docs/adr/0013); local schema 4. Older
+  requests and stores still read: the section is ignored.
 - **Rows** may only gain optional fields; every older row sample must keep reading.
 - **local** gets a new schema and a migration in `BookStore.TryRead` when its shape changes.

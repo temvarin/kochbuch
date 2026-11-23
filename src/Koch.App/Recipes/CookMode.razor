@@ -1,0 +1,80 @@
+@page "/rezept/{Id:guid}/kochen"
+@implements IAsyncDisposable
+@inject RecipeService Recipes
+@inject Browser Browser
+@inject NavigationManager Nav
+
+@* Cooking: one step at a time, large enough to read from the stove, the screen kept on (docs/adr/0014). *@
+@if (Recipe is not { } recipe || recipe.Steps.Count == 0)
+{
+    <TopBar Title="Kochen" Back="@($"rezept/{Id}")" />
+    <p class="empty">Für dieses Rezept sind keine Schritte eingetragen.</p>
+}
+else
+{
+    var step = recipe.Steps[index];
+    <PageTitle>Kochen: @recipe.Title – Kochbuch</PageTitle>
+    <div class="cook">
+        <div class="cook-head">
+            <span class="muted">@recipe.Title · @Servings @(Servings == 1 ? "Portion" : "Portionen")</span>
+            <a class="icon-btn" href="rezept/@recipe.Id" aria-label="Kochen beenden"><Icon Name="close" /></a>
+        </div>
+        <div class="progress" role="img" aria-label="Schritt @(index + 1) von @recipe.Steps.Count">
+            @for (var i = 0; i < recipe.Steps.Count; i++)
+            {
+                <span class="@(i < index ? "done" : i == index ? "now" : "")"></span>
+            }
+        </div>
+
+        <p class="display step-count">Schritt @(index + 1) von @recipe.Steps.Count</p>
+        <p class="step-text" data-testid="step-text">@step</p>
+
+        @if (Needed(recipe, step) is { Count: > 0 } needed)
+        {
+            <h2 class="label">Dafür</h2>
+            <ul class="chips" data-testid="needed">
+                @foreach (var line in needed)
+                {
+                    <li>@(line.Amount is { } q ? $"{German.Quantity(q)} " : "")@line.Ingredient</li>
+                }
+            </ul>
+        }
+
+        <p class="hint">Der Bildschirm bleibt an, solange gekocht wird.</p>
+        <div class="cook-nav">
+            <button class="btn" disabled="@(index == 0)" @onclick="() => index--">Zurück</button>
+            @if (index < recipe.Steps.Count - 1)
+            {
+                <button class="btn primary" data-testid="next" @onclick="() => index++">Weiter</button>
+            }
+            else
+            {
+                <a class="btn primary" href="rezept/@recipe.Id" data-testid="done">Fertig</a>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    /// <summary>The servings chosen on the recipe page; the recipe's own number without one.</summary>
+    [SupplyParameterFromQuery(Name = "portionen")] public int? Portionen { get; set; }
+
+    private int index;
+
+    private Recipe? Recipe => Recipes.Find(Id);
+
+    private int Servings => Portionen is >= 1 and <= Recipe.MaxServings ? Portionen.Value : Recipe?.Servings ?? 1;
+
+    /// <summary>The ingredients the step names, scaled: what to have at hand now.</summary>
+    private IReadOnlyList<RecipeLine> Needed(Recipe recipe, string step) =>
+        [.. recipe.LinesFor(Servings).Where(l => step.Contains(l.Ingredient, StringComparison.OrdinalIgnoreCase))];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.KeepScreenOnAsync();
+    }
+
+    public async ValueTask DisposeAsync() => await Browser.LetScreenSleepAsync();
+}

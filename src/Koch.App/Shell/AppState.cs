@@ -28,8 +28,8 @@ public abstract class DataState<TBook, TChanges>(Synced<TBook, TChanges> data, A
 }
 
 /// <summary>The recipe book (localStorage key koch.recipes).</summary>
-public sealed class RecipeState(BookStore store) : DataState<RecipeBook, BookChanges>(store.Load(), book => store.Save((SyncedBook)book));
+public sealed class RecipeState(BookStore store) : DataState<RecipeBook, BookChanges>(store.Load(), store.Save);
 
 /// <summary>The shopping lists (localStorage key koch.shopping).</summary>
 public sealed class ShoppingState(ShoppingStore store)
-    : DataState<ShoppingBook, ShoppingChanges>(store.Load(), lists => store.Save((SyncedShopping)lists));
+    : DataState<ShoppingBook, ShoppingChanges>(store.Load(), store.Save);

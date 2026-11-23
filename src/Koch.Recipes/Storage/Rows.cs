@@ -11,18 +11,20 @@ namespace Koch.Recipes.Storage;
 
 /// <summary>
 /// The rows' JSON, kept apart from the API's serializer: a change to the API must not change stored rows, which are
-/// never migrated (tests/Koch.Recipes.Domain.Tests/Contracts, "row-recipe", "row-ingredient").
+/// never migrated (tests/Koch.Recipes.Tests/Contracts, "row-recipe").
 /// </summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web,
     RespectNullableAnnotations = true, RespectRequiredConstructorParameters = true)]
 [JsonSerializable(typeof(RecipeJson))]
-[JsonSerializable(typeof(IngredientJson))]
 public sealed partial class RowJson : JsonSerializerContext;
 
-/// <summary>Between the recipe book and its rows: one row per recipe and per ingredient.</summary>
+/// <summary>
+/// Between the recipe book and its rows: one row per recipe. Rows <c>ingredient:{id}</c> from before docs/adr/0013 may
+/// still be in the table; nothing reads or writes them.
+/// </summary>
 public static class Rows
 {
-    private const string RecipePrefix = "recipe:", IngredientPrefix = "ingredient:";
+    private const string RecipePrefix = "recipe:";
 
     /// <param name="bases">
     /// Changed recipes as the phone last got them: those are merged with the stored recipe under its row lock
@@ -36,8 +38,6 @@ public static class Rows
             .. changes.Recipes.Changed.Select(r => new RowWrite(RecipePrefix + r.Id, Write(r),
                 baseOf.TryGetValue(r.Id, out var baseRecipe) ? stored => Write(RecipeMerge.Merge(baseRecipe, ReadRecipe(stored), r)) : null)),
             .. changes.Recipes.Removed.Select(id => new RowWrite(RecipePrefix + id, null)),
-            .. changes.Ingredients.Changed.Select(i => new RowWrite(IngredientPrefix + i.Id, JsonSerializer.Serialize(i.ToJson(), RowJson.Default.IngredientJson))),
-            .. changes.Ingredients.Removed.Select(id => new RowWrite(IngredientPrefix + id, null)),
         ];
     }
 
@@ -48,15 +48,9 @@ public static class Rows
         (JsonSerializer.Deserialize(json, RowJson.Default.RecipeJson) ?? throw new JsonException("A recipe row is null.")).ToDomain();
 
     /// <exception cref="JsonException">A row is not what this service writes.</exception>
-    public static RecipeBook ToBook(IEnumerable<StoredRow> rows)
-    {
-        var list = rows.ToList();
-        return new RecipeBook(
-            list.Where(r => r.Id.StartsWith(RecipePrefix, StringComparison.Ordinal))
-                .Select(r => Read(r, RowJson.Default.RecipeJson).ToDomain()),
-            list.Where(r => r.Id.StartsWith(IngredientPrefix, StringComparison.Ordinal))
-                .Select(r => Read(r, RowJson.Default.IngredientJson).ToDomain()));
-    }
+    public static RecipeBook ToBook(IEnumerable<StoredRow> rows) => new(rows
+        .Where(r => r.Id.StartsWith(RecipePrefix, StringComparison.Ordinal))
+        .Select(r => Read(r, RowJson.Default.RecipeJson).ToDomain()));
 
     /// <summary>
     /// The photo events a changed row causes: a recipe that now shows another photo, or none, detaches the old one and

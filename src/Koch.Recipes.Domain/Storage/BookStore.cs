@@ -32,10 +32,10 @@ public sealed class BookStore(IKeyValueStore store)
 
     /// <summary>
     /// 1 since 2026-11-22; 2 since 2026-11-22, when recipes got a photo; 3 since 2026-11-22, when the unanswered
-    /// changes are kept as a protocol-3 request. Older schemas read as they are: no photo, protocol 2 (the merge needs
-    /// no bases for unanswered changes, docs/adr/0012).
+    /// changes are kept as a protocol-3 request; 4 since 2026-11-22, without the ingredient catalogue (docs/adr/0013).
+    /// Older schemas read as they are: no photo, no bases, and the catalogue they hold is ignored.
     /// </summary>
-    internal const int Schema = 3;
+    internal const int Schema = 4;
 
     public SyncedBook Load()
     {
@@ -45,9 +45,9 @@ public sealed class BookStore(IKeyValueStore store)
         return new SyncedBook();
     }
 
-    public void Save(SyncedBook book) => store.Write(Key, Serialize(book));
+    public void Save(Synced<RecipeBook, BookChanges> book) => store.Write(Key, Serialize(book));
 
-    public static string Serialize(SyncedBook book) => JsonSerializer.Serialize(
+    public static string Serialize(Synced<RecipeBook, BookChanges> book) => JsonSerializer.Serialize(
         new StoredBookJson(Schema, book.Book.ToJson(),
             book.State is { } state ? new LastSyncJson(state.LastSync, state.Base.ToJson()) : null,
             book.Unconfirmed?.ToJson()),
@@ -60,7 +60,7 @@ public sealed class BookStore(IKeyValueStore store)
         {
             return JsonSerializer.Deserialize(json, LocalJson.Default.StoredBookJson) switch
             {
-                { Schema: 1 or 2 or Schema } stored => new SyncedBook(stored.Book.ToDomain(),
+                { Schema: >= 1 and <= Schema } stored => new SyncedBook(stored.Book.ToDomain(),
                     stored.Sync is { } sync ? new SyncState<RecipeBook>(sync.At, sync.Base.ToDomain()) : null,
                     stored.Unconfirmed?.ToDomain()),
                 _ => null,

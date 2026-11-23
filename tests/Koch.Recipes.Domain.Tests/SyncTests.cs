@@ -14,7 +14,7 @@ public class SyncTests
         public void Sync(SyncedBook phone, bool loseAnswer = false)
         {
             var pending = phone.StartSync();
-            Book = Book.Apply(pending.Changes, phone.BasesFor(pending.Changes));
+            Book = Book.Apply(pending.Changes, pending.Changes.BasesIn(phone.State?.Base));
             if (loseAnswer) phone.SyncFailed(pending);
             else phone.CompleteSync(pending, Book, Known.Now);
         }
@@ -26,7 +26,6 @@ public class SyncTests
     private static void SameContent(RecipeBook expected, RecipeBook actual)
     {
         Assert.Equal(expected.Recipes.OrderBy(r => r.Id), actual.Recipes.OrderBy(r => r.Id));
-        Assert.Equal(expected.Ingredients.OrderBy(i => i.Id), actual.Ingredients.OrderBy(i => i.Id));
     }
 
     [Fact]
@@ -168,22 +167,6 @@ public class SyncTests
         service.Sync(ben);
 
         Assert.Equal("Bens Suppe", Assert.Single(ben.Book.Recipes).Title);
-    }
-
-    [Fact]
-    public void An_ingredient_both_phones_add_offline_ends_up_once()
-    {
-        var (service, anna, ben) = (new Service(), new SyncedBook(), new SyncedBook());
-        anna.Change(book => book.Save(Known.Recipe(Guid.NewGuid(), "Suppe", 2, new RecipeLine("Kartoffeln", null))));
-        ben.Change(book => book.Save(Known.Recipe(Guid.NewGuid(), "Auflauf", 2, new RecipeLine(" kartoffeln", null))));
-
-        service.Sync(anna);
-        service.Sync(ben);
-        service.Sync(anna);
-
-        Assert.Single(service.Book.Ingredients);
-        SameContent(service.Book, anna.Book);
-        SameContent(service.Book, ben.Book);
     }
 
     /// <summary>

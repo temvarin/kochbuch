@@ -12,7 +12,7 @@
 }
 else
 {
-    <form @onsubmit="Save" class="recipe-form">
+    <div class="recipe-form">
         <label class="field">
             <span>Name</span>
             <input @bind="draft.Title" maxlength="@Recipe.MaxTitle" placeholder="z. B. Kartoffelsuppe" data-testid="title" />
@@ -22,7 +22,61 @@ else
             <input type="number" min="1" max="@Recipe.MaxServings" @bind="draft.Servings" data-testid="servings" />
         </label>
 
-        <div class="section"><h2>Foto</h2></div>
+        <h2 class="display">Zutaten</h2>
+        @if (draft.Lines.Count > 0)
+        {
+            <ul class="card list edit-lines" data-testid="lines">
+                @foreach (var line in draft.Lines)
+                {
+                    <li>
+                        <button type="button" class="line" aria-label="Ändern: @IngredientText.Format(line)" @onclick="() => Edit(line)">
+                            <span class="amount">@(line.Amount is { } q ? German.Quantity(q) : "–")</span>
+                            <span class="name">@line.Ingredient@(line.Note.Length > 0 ? $", {line.Note}" : "")</span>
+                        </button>
+                        <button type="button" class="icon-btn" aria-label="Entfernen: @line.Ingredient" @onclick="() => draft.Lines.Remove(line)"><Icon Name="close" /></button>
+                    </li>
+                }
+            </ul>
+        }
+        @* A form of its own: Enter adds the line and keeps the field open for the next one. *@
+        <form class="add-line" @onsubmit="AddLine">
+            <label class="field">
+                <span>Zutat hinzufügen</span>
+                <input @bind="draft.NewLine" @bind:event="oninput" list="zutaten" placeholder="z. B. 500 g Kartoffeln, festkochend"
+                       enterkeyhint="enter" data-testid="new-line" />
+            </label>
+            <button type="submit" class="btn primary" aria-label="Zutat übernehmen"><Icon Name="check" /></button>
+        </form>
+        <datalist id="zutaten">
+            @foreach (var name in Recipes.IngredientNames)
+            {
+                <option value="@name"></option>
+            }
+        </datalist>
+        @if (Preview is { } read)
+        {
+            <p class="hint" data-testid="preview">Erkannt: <b>@(read.Amount is { } q ? German.Quantity(q) : "ohne Menge")</b> · <b>@read.Ingredient</b>@(read.Note.Length > 0 ? " · " + read.Note : "")</p>
+        }
+        else
+        {
+            <p class="hint">Menge, Einheit, Zutat, nach dem Komma ein Hinweis. Ohne Menge, z. B. „Salz“: nach Geschmack.</p>
+        }
+
+        <h2 class="display">Zubereitung</h2>
+        @foreach (var (step, index) in draft.Steps.Select((s, i) => (s, i)))
+        {
+            <label class="field">
+                <span>Schritt @(index + 1)</span>
+                <textarea rows="3" @bind="step.Text" @bind:after="KeepEmptyStep" maxlength="@Recipe.MaxStep" data-testid="step"></textarea>
+            </label>
+        }
+
+        <label class="field">
+            <span>Notizen</span>
+            <textarea rows="3" @bind="draft.Notes" maxlength="@Recipe.MaxNotes"></textarea>
+        </label>
+
+        <h2 class="display">Foto</h2>
         <section class="card photo-edit">
             @if (preview is not null)
             {
@@ -50,78 +104,12 @@ else
             }
         </section>
 
-        <div class="section"><h2>Zutaten</h2></div>
-        <datalist id="zutaten">
-            @foreach (var name in Recipes.IngredientNames)
-            {
-                <option value="@name"></option>
-            }
-        </datalist>
-        @foreach (var (line, index) in draft.Lines.Select((l, i) => (l, i)))
-        {
-            <fieldset class="card line-edit" data-testid="line">
-                <legend class="visually-hidden">Zutat @(index + 1)</legend>
-                <div class="amount-unit">
-                    <label class="field">
-                        <span>Menge</span>
-                        <input @bind="line.Amount" inputmode="decimal" placeholder="leer = nach Geschmack" data-testid="amount" />
-                    </label>
-                    <label class="field">
-                        <span>Einheit</span>
-                        <select @bind="line.Unit" data-testid="unit">
-                            @foreach (var unit in Units.InOrder)
-                            {
-                                <option value="@unit">@unit.Code()</option>
-                            }
-                        </select>
-                    </label>
-                </div>
-                <label class="field">
-                    <span>Zutat</span>
-                    <input @bind="line.Ingredient" @bind:after="KeepEmptyLine" list="zutaten" maxlength="@RecipeLine.MaxName" data-testid="ingredient" />
-                </label>
-                <label class="field">
-                    <span>Hinweis</span>
-                    <input @bind="line.Note" maxlength="@RecipeLine.MaxNote" placeholder="z. B. festkochend" />
-                </label>
-                @if (draft.Lines.Count > 1)
-                {
-                    <button type="button" class="btn danger" @onclick="() => draft.Lines.Remove(line)">Zutat entfernen</button>
-                }
-            </fieldset>
-        }
-
-        <div class="section"><h2>Zubereitung</h2></div>
-        @foreach (var (step, index) in draft.Steps.Select((s, i) => (s, i)))
-        {
-            <label class="field">
-                <span>Schritt @(index + 1)</span>
-                <textarea rows="3" @bind="step.Text" @bind:after="KeepEmptyStep" maxlength="@Recipe.MaxStep" data-testid="step"></textarea>
-            </label>
-        }
-
-        <label class="field">
-            <span>Notizen</span>
-            <textarea rows="3" @bind="draft.Notes" maxlength="@Recipe.MaxNotes"></textarea>
-        </label>
-
         @if (error is not null)
         {
             <p class="error" role="alert" data-testid="error">@error</p>
         }
-        <button type="submit" class="btn primary" data-testid="save">Speichern</button>
-        @if (Id is { } existing)
-        {
-            @if (confirmRemove)
-            {
-                <button type="button" class="btn danger" data-testid="remove-confirm" @onclick="() => Remove(existing)">Wirklich löschen</button>
-            }
-            else
-            {
-                <button type="button" class="btn danger" data-testid="remove" @onclick="() => confirmRemove = true">Rezept löschen</button>
-            }
-        }
-    </form>
+        <button type="button" class="btn primary" data-testid="save" @onclick="Save">Speichern</button>
+    </div>
 }
 
 @code {
@@ -129,13 +117,20 @@ else
 
     private RecipeDraft? draft;
     private string? error, photoError, preview;
-    private bool confirmRemove, uploading;
+    private bool uploading;
 
     protected override void OnParametersSet()
     {
         draft = Id is { } id ? (Recipes.Find(id) is { } recipe ? RecipeDraft.From(recipe) : null) : new RecipeDraft();
-        (error, photoError, preview, confirmRemove) = (null, null, null, false);
+        (error, photoError, preview) = (null, null, null);
     }
+
+    // How the line being typed will be read; nothing while it can't be read yet.
+    private RecipeLine? Preview => draft!.NewLine.Trim().Length > 0 ? IngredientText.TryParse(draft.NewLine, out _) : null;
+
+    private void AddLine() => draft!.TryAddNewLine(out error);
+
+    private void Edit(RecipeLine line) => draft!.TryEdit(line, out error);
 
     private async Task UploadPhoto(InputFileChangeEventArgs e)
     {
@@ -165,12 +160,7 @@ else
 
     private void RemovePhoto() => (draft!.Photo, preview) = (null, null);
 
-    // There is always one empty line and one empty step at the end, for the next one.
-    private void KeepEmptyLine()
-    {
-        if (!draft!.Lines[^1].IsBlank) draft.Lines.Add(new());
-    }
-
+    // There is always one empty step at the end, for the next one.
     private void KeepEmptyStep()
     {
         if (draft!.Steps[^1].Text.Trim().Length > 0) draft.Steps.Add(new());
@@ -182,11 +172,5 @@ else
         if (draft!.TryBuild(id, out error) is not { } recipe) return;
         Recipes.Save(recipe);
         Nav.NavigateTo($"rezept/{id}");
-    }
-
-    private void Remove(Guid id)
-    {
-        Recipes.Remove(id);
-        Nav.NavigateTo("");
     }
 }

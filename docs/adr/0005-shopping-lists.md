@@ -2,6 +2,11 @@
 
 **Status:** Accepted (2026-11-22)
 
+> **Aisles were removed by ADR-0013.** Lists now show open items by name; the aisle parts below are history.
+>
+> **There is one list since ADR-0014.** Recipes go onto it from their page; the dated lists and the recipe picker below
+> are history. Contributions stay separate and add up, as decided here.
+
 ## Context
 The household chooses recipes and servings and gets one shopping list with matching ingredients combined: 500 g +
 300 g Kartoffeln = 800 g. In the shop, both phones tick items, often with poor reception. ADR-0001 made Shopping its

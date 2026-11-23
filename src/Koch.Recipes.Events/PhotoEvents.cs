@@ -6,7 +6,7 @@ namespace Koch.Recipes.Events;
 
 /// <summary>
 /// A recipe started or stopped showing a photo. Published as a CloudEvent (structured JSON) into the Service Bus queue
-/// <see cref="PhotoEvents.Queue"/>; samples of every released version are in tests/Koch.Recipes.Tests/Contracts/events.
+/// <see cref="PhotoEvents.Queue"/>; samples of every released version are in tests/Koch.Recipes.Tests/Contracts/event-photo-*.
 /// </summary>
 /// <param name="Photo">The photo's id (Koch.Media.Contracts.PhotoPaths).</param>
 /// <param name="Recipe">The recipe that attached or detached it: for the logs, the consumer needs no more.</param>

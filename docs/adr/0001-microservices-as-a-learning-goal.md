@@ -23,7 +23,7 @@ The system is a small set of deployables, each split off for a reason that would
 | Deployable | Hosting | Why it is separate |
 |---|---|---|
 | **Gateway** (BFF) | Container App, external | The one public origin: serves the PWA, signs members in with Easy Auth, forwards to the services. The cookie and the same-origin CSRF defence need a single origin (ADR-0002). |
-| **Recipes** | Container App, internal | The system of record for recipes and the ingredient catalogue. |
+| **Recipes** | Container App, internal | The system of record for recipes (and, until ADR-0013, an ingredient catalogue). |
 | **Shopping** | Container App, internal | Owns the lifecycle of a shopping list: create, sync, tick off, archive. Lists are snapshots built on the phone (ADR-0005). This is the thinnest service; see Consequences. |
 | **Media** | Azure Functions (Flex Consumption) | Photo processing is asynchronous, CPU- and memory-heavy, bursty and allowed to fail on its own. Those runtime needs differ from interactive HTTP (FOSA ch07 p.96-99, quanta; Newman p.33, matching each service to the cloud runtime that suits it). |
 

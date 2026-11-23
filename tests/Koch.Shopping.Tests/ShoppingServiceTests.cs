@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Koch.Gateway.Contracts;
-using Koch.Kernel;
 using Koch.Kernel.Measures;
 using Koch.ServiceDefaults.Documents;
 using Koch.Shopping.Contracts;
@@ -20,8 +19,6 @@ namespace Koch.Shopping.Tests;
 /// <summary><c>POST /sync</c> as the gateway forwards it, with the rows in memory.</summary>
 public sealed class SyncApiTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
-    private static readonly Guid ListId = new("11111111-1111-1111-1111-111111111111");
-
     private readonly MemoryDocumentRows store = new();
 
     private HttpClient Service() => factory.WithWebHostBuilder(host =>
@@ -31,9 +28,7 @@ public sealed class SyncApiTests(WebApplicationFactory<Program> factory) : IClas
     }).CreateClient();
 
     private static ShoppingBook List() => ShoppingBook.Empty
-        .Save(new ShoppingList(ListId, "Wocheneinkauf", new DateTimeOffset(2026, 11, 22, 18, 0, 0, TimeSpan.Zero)))
-        .Add(ListId, [new PlannedLine("Kartoffeln", new Quantity(500, Unit.Gramm), Aisle.ObstGemuese, "Suppe")],
-            () => new Guid("22222222-2222-2222-2222-000000000001"));
+        .Add([new PlannedLine("Kartoffeln", new Quantity(500, Unit.Gramm), "Suppe")], () => new Guid("22222222-2222-2222-2222-000000000001"));
 
     private static async Task<HttpResponseMessage> Post(HttpClient service, HttpContent content, bool forwarded = true)
     {
@@ -46,17 +41,17 @@ public sealed class SyncApiTests(WebApplicationFactory<Program> factory) : IClas
         changes.ToJson() with { Protocol = protocol ?? ShoppingSyncRequestJson.CurrentProtocol }, ShoppingJson.Default.ShoppingSyncRequestJson);
 
     [Fact]
-    public async Task A_list_and_its_items_come_back_to_the_next_phone_and_ticks_too()
+    public async Task The_items_come_back_to_the_next_phone_and_ticks_too()
     {
         var service = Service();
         await Post(service, Json(ShoppingChanges.Between(ShoppingBook.Empty, List())));
-        var ticked = List().Check(ListId, "kartoffeln", true);
+        var ticked = List().Check("kartoffeln", true);
         await Post(service, Json(ShoppingChanges.Between(List(), ticked)));
 
         var response = await Post(service, Json(ShoppingChanges.None));
 
         var book = (await response.Content.ReadFromJsonAsync(ShoppingJson.Default.ShoppingSyncResponseJson))!.ToDomain();
-        Assert.True(Assert.Single(book.Lines(ListId)).Checked);
+        Assert.True(Assert.Single(book.Lines()).Checked);
     }
 
     [Fact]
@@ -65,11 +60,11 @@ public sealed class SyncApiTests(WebApplicationFactory<Program> factory) : IClas
         Assert.Equal(HttpStatusCode.Conflict, (await Post(Service(), Json(ShoppingChanges.None, protocol: 0))).StatusCode);
 
         var json = ShoppingChanges.Between(ShoppingBook.Empty, List()).ToJson();
-        var broken = json with { Items = json.Items with { Changed = [json.Items.Changed[0] with { Aisle = "keller" }] } };
+        var broken = json with { Items = json.Items with { Changed = [json.Items.Changed[0] with { Name = "" }] } };
         var response = await Post(Service(), JsonContent.Create(broken, ShoppingJson.Default.ShoppingSyncRequestJson));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal(0, store.VersionOf($"list:{ListId}"));
+        Assert.Equal(0, store.VersionOf("item:22222222-2222-2222-2222-000000000001"));
     }
 
     [Fact]
@@ -97,7 +92,7 @@ public sealed class DatabaseTests : IAsyncLifetime
         Assert.False(await rows.CanReadAsync());
 
         foreach (var script in SqlDatabase.Scripts("shopping")) await sql.ExecuteAsync(script);
-        await rows.WriteAndReadAsync([new("list:a", """{"x":1}""")]);
+        await rows.WriteAndReadAsync([new("item:a", """{"x":1}""")]);
         foreach (var script in SqlDatabase.Scripts("shopping")) await sql.ExecuteAsync(script);
 
         Assert.True(await rows.CanReadAsync());
@@ -111,18 +106,16 @@ public class RowContractTests
     private static readonly string Folder = Path.Combine(AppContext.BaseDirectory, "Contracts");
 
     private static ShoppingBook Book() => ShoppingBook.Empty
-        .Save(new ShoppingList(new Guid("11111111-1111-1111-1111-111111111111"), "Wocheneinkauf", new DateTimeOffset(2026, 11, 22, 18, 0, 0, TimeSpan.Zero)))
-        .Add(new Guid("11111111-1111-1111-1111-111111111111"),
-            [new PlannedLine("Kartoffeln", new Quantity(500, Unit.Gramm), Aisle.ObstGemuese, "Kartoffelsuppe")],
+        .Add([new PlannedLine("Kartoffeln", new Quantity(500, Unit.Gramm), "Kartoffelsuppe")],
             () => new Guid("22222222-2222-2222-2222-000000000001"));
 
-    public static TheoryData<string> Names => ["row-list", "row-item"];
+    // "row-list" holds rows of the lists removed by docs/adr/0014: no longer written or read, still in the tables.
+    public static TheoryData<string> Names => ["row-item"];
 
     [Theory, MemberData(nameof(Names))]
     public void This_version_writes_exactly_the_newest_sample_and_reads_it_back(string name)
     {
-        var written = Rows.For(ShoppingChanges.Between(ShoppingBook.Empty, Book()))
-            .Single(r => r.Id.StartsWith(name == "row-list" ? "list:" : "item:", StringComparison.Ordinal)).Json!;
+        var written = Rows.For(ShoppingChanges.Between(ShoppingBook.Empty, Book())).Single().Json!;
         var newest = Directory.Exists(Path.Combine(Folder, name))
             ? Directory.GetFiles(Path.Combine(Folder, name), "v*.json").Order(StringComparer.Ordinal).LastOrDefault()
             : null;
@@ -136,8 +129,8 @@ public class RowContractTests
 
         foreach (var sample in Directory.GetFiles(Path.Combine(Folder, name), "v*.json"))
         {
-            var book = Rows.ToBook([new StoredRow(name == "row-list" ? "list:x" : "item:x", File.ReadAllText(sample))]);
-            Assert.Equal(1, book.Lists.Count + book.Items.Count);
+            var book = Rows.ToBook([new StoredRow("item:x", File.ReadAllText(sample))]);
+            Assert.Single(book.Items);
         }
     }
 

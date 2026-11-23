@@ -16,9 +16,6 @@ public sealed record RecipeJson(
     Guid Id, string Title, int Servings, IReadOnlyList<LineJson> Lines, IReadOnlyList<string> Steps, string Notes,
     Guid? Photo = null);
 
-/// <param name="Aisle">"sonstiges", "obst-gemuese", "kuehlregal", …</param>
-public sealed record IngredientJson(string Name, string Aisle);
-
 /// <summary>Changed items travel whole; removed ones as their id.</summary>
 /// <param name="Bases">
 /// Since protocol 3: some changed recipes as the phone last got them from the service, so it can merge them with the
@@ -27,19 +24,18 @@ public sealed record IngredientJson(string Name, string Aisle);
 public sealed record RecipeChangesJson(IReadOnlyList<RecipeJson> Changed, IReadOnlyList<Guid> Removed,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<RecipeJson>? Bases = null);
 
-/// <summary>An ingredient's id is derived from its name, so a removed one travels as that id.</summary>
-public sealed record IngredientChangesJson(IReadOnlyList<IngredientJson> Changed, IReadOnlyList<Guid> Removed);
-
 /// <summary>What changed on a phone since its last sync.</summary>
-public sealed record SyncRequestJson(int Protocol, RecipeChangesJson Recipes, IngredientChangesJson Ingredients)
+/// <remarks>Protocols 1–3 also had "ingredients", the catalogue with aisles; readers ignore it (docs/adr/0013).</remarks>
+public sealed record SyncRequestJson(int Protocol, RecipeChangesJson Recipes)
 {
     /// <summary>
     /// The service answers 409 to any other, and the app asks to be reloaded. 2 since 2026-11-22: recipes have a photo,
     /// which an app of protocol 1 would clear by sending the recipe without it. 3 since 2026-11-22: changed recipes
-    /// come with their bases and are merged, so every phone should send them.
+    /// come with their bases and are merged, so every phone should send them. 4 since 2026-11-22: no ingredient
+    /// catalogue (docs/adr/0013).
     /// </summary>
-    public const int CurrentProtocol = 3;
+    public const int CurrentProtocol = 4;
 }
 
 /// <summary>The whole book as the service has it after applying the request: the phone's new base.</summary>
-public sealed record SyncResponseJson(IReadOnlyList<RecipeJson> Recipes, IReadOnlyList<IngredientJson> Ingredients);
+public sealed record SyncResponseJson(IReadOnlyList<RecipeJson> Recipes);

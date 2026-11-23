@@ -24,17 +24,17 @@ public class CatalogTests
     }
 
     [Fact]
-    public void Saving_a_recipe_adds_the_ingredients_the_catalogue_lacks_once()
+    public void The_suggestions_are_every_ingredient_the_recipes_name_once_by_name()
     {
-        var book = RecipeBook.Empty.Save(new Ingredient("Kartoffeln", Aisle.ObstGemuese)).Save(Known.Soup());
+        var book = RecipeBook.Empty.Save(Known.Soup())
+            .Save(Known.Recipe(Guid.NewGuid(), "Bratkartoffeln", 2, new RecipeLine("kartoffeln", null), new RecipeLine("Butter", null)));
 
-        Assert.Equal(["Kartoffeln", "Knoblauch", "Öl", "Salz"], book.Ingredients.Select(i => i.Name));
-        Assert.Equal(Aisle.ObstGemuese, book.Ingredients[0].Aisle); // known ones keep their aisle
-        Assert.Equal(Aisle.Sonstiges, book.Ingredients[1].Aisle);
+        // Ordinal, as the app has no culture data: "Öl" after "Salz". The browser filters the list while typing anyway.
+        Assert.Equal(["Butter", "Kartoffeln", "Knoblauch", "Salz", "Öl"], book.IngredientNames);
     }
 
     [Fact]
-    public void Saving_again_replaces_the_recipe_and_removing_keeps_the_catalogue()
+    public void Saving_again_replaces_the_recipe_and_removing_removes_it()
     {
         var book = RecipeBook.Empty.Save(Known.Soup());
         var renamed = new Recipe(Known.SoupId, "Suppe", 2, [], []);
@@ -44,14 +44,12 @@ public class CatalogTests
 
         book = book.Remove(Known.SoupId);
         Assert.Empty(book.Recipes);
-        Assert.Equal(4, book.Ingredients.Count);
+        Assert.Empty(book.IngredientNames);
     }
 
     [Fact]
     public void A_book_refuses_two_recipes_with_one_id()
     {
-        Assert.Throws<ArgumentException>(() => new RecipeBook([Known.Soup(), Known.Soup()], []));
-        Assert.Throws<ArgumentException>(() => new RecipeBook([],
-            [new Ingredient("Salz", Aisle.Gewuerze), new Ingredient("salz", Aisle.Vorrat)]));
+        Assert.Throws<ArgumentException>(() => new RecipeBook([Known.Soup(), Known.Soup()]));
     }
 }

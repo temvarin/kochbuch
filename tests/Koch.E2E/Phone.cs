@@ -8,11 +8,11 @@ public sealed class Phone(IBrowserContext context, IPage page) : IAsyncDisposabl
 {
     public IPage Page => page;
 
-    /// <summary>Loads the app at <paramref name="path"/> and waits until Blazor shows the page's title.</summary>
+    /// <summary>Loads the app at <paramref name="path"/> and waits until Blazor shows the page's heading.</summary>
     public async Task OpenAsync(string path = "")
     {
         await page.GotoAsync(path);
-        await page.Locator(".topbar h1").WaitForAsync();
+        await page.Locator("h1").First.WaitForAsync();
     }
 
     /// <summary>Taken out of the network, as in the shop's cellar; the app stays open.</summary>
@@ -29,7 +29,7 @@ public sealed class Phone(IBrowserContext context, IPage page) : IAsyncDisposabl
         var shopping = page.WaitForResponseAsync(r => r.Url.EndsWith("/api/shopping/sync", StringComparison.Ordinal) && r.Ok);
         await button.ClickAsync();
         await Task.WhenAll(recipes, shopping);
-        await Expect(page.GetByTestId("sync-status")).ToHaveTextAsync("zuletzt gerade eben");
+        await Expect(page.GetByTestId("sync-status")).ToHaveTextAsync("Abgeglichen · gerade eben");
     }
 
     /// <summary>A tab of the bottom bar: "Rezepte" or "Einkauf". In-app navigation, so it works offline too.</summary>
@@ -39,8 +39,15 @@ public sealed class Phone(IBrowserContext context, IPage page) : IAsyncDisposabl
     public async Task OpenRecipeAsync(string title)
     {
         await GoToAsync("Rezepte");
-        await page.Locator("a.line", new() { HasText = title }).ClickAsync();
-        await Expect(page.Locator(".topbar h1")).ToHaveTextAsync(title);
+        await page.Locator("a.tile", new() { HasText = title }).ClickAsync();
+        await Expect(page.Locator("h1.recipe-title")).ToHaveTextAsync(title);
+    }
+
+    /// <summary>From the recipe page: the ⋯ menu, then "Bearbeiten".</summary>
+    public async Task EditRecipeAsync()
+    {
+        await page.GetByLabel("Mehr: Bearbeiten, Löschen").ClickAsync();
+        await page.GetByTestId("edit").ClickAsync();
     }
 
     /// <summary>Fills a field the way typing does, then leaves it, so Blazor's change binding sees the value.</summary>
@@ -50,22 +57,18 @@ public sealed class Phone(IBrowserContext context, IPage page) : IAsyncDisposabl
         await field.PressAsync("Tab");
     }
 
-    /// <summary>Adds a line at the form's empty last line, which the form keeps for the next ingredient.</summary>
-    public async Task AddLineAsync(string ingredient, string? amount = null, string unit = "g")
+    /// <summary>Types an ingredient as one line, "500 g Kartoffeln", and presses Enter, as on a phone keyboard.</summary>
+    public async Task AddLineAsync(string line)
     {
-        var line = page.GetByTestId("line").Last;
-        if (amount is not null)
-        {
-            await SetAsync(line.GetByTestId("amount"), amount);
-            await line.GetByTestId("unit").SelectOptionAsync(new SelectOptionValue { Label = unit });
-        }
-        await SetAsync(line.GetByTestId("ingredient"), ingredient);
+        await page.GetByTestId("new-line").FillAsync(line);
+        await page.GetByTestId("new-line").PressAsync("Enter");
+        await Expect(page.GetByTestId("new-line")).ToHaveValueAsync("");
     }
 
     public async Task SaveRecipeAsync(string title)
     {
         await page.GetByTestId("save").ClickAsync();
-        await Expect(page.Locator(".topbar h1")).ToHaveTextAsync(title);
+        await Expect(page.Locator("h1.recipe-title")).ToHaveTextAsync(title);
     }
 
     /// <summary>The ingredient names as the recipe page shows them.</summary>

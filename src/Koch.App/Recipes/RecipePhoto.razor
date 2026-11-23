@@ -1,15 +1,16 @@
 @* A recipe's photo from the gateway. Until Media has processed a new upload, the address answers 404: then a placeholder
    shows, and the next visit tries again (the service worker caches only photos that arrived). *@
-@if (missing)
+@if (missing && Fallback is not null)
 {
-    <div class="@(Thumbnail ? "thumb placeholder" : "photo placeholder")" aria-label="@Alt" role="img">
-        @(Thumbnail ? "" : "Das Foto wird noch vorbereitet.")
-    </div>
+    @Fallback
+}
+else if (missing)
+{
+    <div class="@Class placeholder" aria-label="@Alt" role="img">Das Foto wird noch vorbereitet.</div>
 }
 else
 {
-    <img class="@(Thumbnail ? "thumb" : "photo")" src="@PhotoService.Url(Photo, Width)" alt="@Alt" loading="lazy"
-         @onerror="() => missing = true" data-testid="photo" />
+    <img class="@Class" src="@PhotoService.Url(Photo, Width)" alt="@Alt" loading="lazy" @onerror="() => missing = true" data-testid="photo" />
 }
 
 @code {
@@ -20,7 +21,11 @@ else
 
     [Parameter] public string Alt { get; set; } = "";
 
-    [Parameter] public bool Thumbnail { get; set; }
+    /// <summary>"photo" in the edit form, "cover" on tiles and the recipe page.</summary>
+    [Parameter] public string Class { get; set; } = "photo";
+
+    /// <summary>Shown instead of the placeholder while the photo isn't there.</summary>
+    [Parameter] public RenderFragment? Fallback { get; set; }
 
     private bool missing;
     private Guid shown;

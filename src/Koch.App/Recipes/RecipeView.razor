@@ -1,6 +1,8 @@
 @page "/rezept/{Id:guid}"
 @inherits LiveComponent
 @inject RecipeService Recipes
+@inject ShoppingService Shopping
+@inject NavigationManager Nav
 
 @if (Recipe is not { } recipe)
 {
@@ -9,44 +11,53 @@
 }
 else
 {
-    <TopBar Title="@recipe.Title" Back="" />
+    <PageTitle>@recipe.Title – Kochbuch</PageTitle>
+    <div class="hero">
+        <RecipeCover Recipe="recipe" Width="1200" Alt="@($"Foto: {recipe.Title}")" />
+        <a class="round-btn back" href="" aria-label="Zurück"><Icon Name="back" /></a>
+        <MoreMenu Label="Mehr: Bearbeiten, Löschen" Class="on-hero">
+            <a href="rezept/@recipe.Id/bearbeiten" data-testid="edit">Bearbeiten</a>
+            @if (confirmRemove)
+            {
+                <button type="button" class="danger" data-testid="remove-confirm" @onclick="() => Remove(recipe.Id)">Wirklich löschen</button>
+            }
+            else
+            {
+                <button type="button" class="danger" data-testid="remove" @onclick="() => confirmRemove = true" @onclick:stopPropagation>Löschen</button>
+            }
+        </MoreMenu>
+    </div>
+    <h1 class="display recipe-title">@recipe.Title</h1>
     <SyncBanner />
-    @if (recipe.Photo is { } photo)
-    {
-        <RecipePhoto Photo="photo" Width="1200" Alt="@($"Foto: {recipe.Title}")" />
-    }
-    <section class="card">
-        <div class="setting">
-            <span>Portionen</span>
-            <div class="stepper">
-                <button class="icon-btn" aria-label="Weniger Portionen" disabled="@(Servings <= 1)" @onclick="() => servings = Servings - 1">−</button>
-                <output data-testid="servings">@Servings</output>
-                <button class="icon-btn" aria-label="Mehr Portionen" disabled="@(Servings >= Koch.Recipes.Domain.Cooking.Recipe.MaxServings)" @onclick="() => servings = Servings + 1">+</button>
-            </div>
-        </div>
-    </section>
 
-    <div class="section"><h2>Zutaten</h2></div>
+    <div class="servings">
+        <span>Für</span>
+        <div class="stepper">
+            <button class="icon-btn" aria-label="Weniger Portionen" disabled="@(Servings <= 1)" @onclick="() => servings = Servings - 1">−</button>
+            <output data-testid="servings">@Servings @(Servings == 1 ? "Portion" : "Portionen")</output>
+            <button class="icon-btn" aria-label="Mehr Portionen" disabled="@(Servings >= Recipe.MaxServings)" @onclick="() => servings = Servings + 1">+</button>
+        </div>
+    </div>
+
+    <h2 class="display">Zutaten</h2>
     @if (recipe.Lines.Count == 0)
     {
         <p class="empty">Keine Zutaten eingetragen.</p>
     }
     else
     {
-        <section class="card list">
-            <ul class="ingredients" data-testid="ingredients">
-                @foreach (var line in recipe.LinesFor(Servings))
-                {
-                    <li class="ingredient">
-                        <span class="amount">@(line.Amount is { } q ? German.Quantity(q) : "")</span>
-                        <span>@line.Ingredient@(line.Note.Length > 0 ? $", {line.Note}" : "")</span>
-                    </li>
-                }
-            </ul>
-        </section>
+        <ul class="ingredients" data-testid="ingredients">
+            @foreach (var line in recipe.LinesFor(Servings))
+            {
+                <li class="ingredient">
+                    <span class="amount">@(line.Amount is { } q ? German.Quantity(q) : "–")</span>
+                    <span>@line.Ingredient@(line.Note.Length > 0 ? $", {line.Note}" : "")</span>
+                </li>
+            }
+        </ul>
     }
 
-    <div class="section"><h2>Zubereitung</h2></div>
+    <h2 class="display">Zubereitung</h2>
     @if (recipe.Steps.Count == 0)
     {
         <p class="empty">Keine Schritte eingetragen.</p>
@@ -63,20 +74,44 @@ else
 
     @if (recipe.Notes.Length > 0)
     {
-        <div class="section"><h2>Notizen</h2></div>
+        <h2 class="display">Notizen</h2>
         <p class="notes">@recipe.Notes</p>
     }
 
-    <a class="btn" href="rezept/@recipe.Id/bearbeiten">Bearbeiten</a>
+    <div class="action-bar">
+        @if (added == Servings)
+        {
+            <a class="btn" href="einkauf" data-testid="on-list"><Icon Name="check" />Auf der Liste</a>
+        }
+        else
+        {
+            <button class="btn" data-testid="add-to-list" @onclick="() => AddToList(recipe)"><Icon Name="plus" />Auf die Liste</button>
+        }
+        <a class="btn primary" href="rezept/@recipe.Id/kochen?portionen=@Servings" data-testid="cook"><Icon Name="play" />Kochen</a>
+    </div>
 }
 
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    private int? servings;
+    private int? servings, added;
+    private bool confirmRemove;
 
-    private Koch.Recipes.Domain.Cooking.Recipe? Recipe => Recipes.Find(Id);
+    private Recipe? Recipe => Recipes.Find(Id);
 
     /// <summary>Starts at the recipe's own number; changing it scales every amount, without changing the recipe.</summary>
     private int Servings => servings ?? Recipe?.Servings ?? 1;
+
+    // Once per visit and number of servings: a second tap would put everything on the list twice.
+    private void AddToList(Recipe recipe)
+    {
+        Shopping.Add(recipe, Servings);
+        added = Servings;
+    }
+
+    private void Remove(Guid id)
+    {
+        Recipes.Remove(id);
+        Nav.NavigateTo("");
+    }
 }

@@ -54,9 +54,9 @@ The images must exist and be **public** in GHCR:
 In the Azure portal: SQL database (kassensturz's) → Query editor, signed in as the Entra admin. Run `db/manual/grants.sql`.
 
 It creates:
-- the `recipes` schema;
-- the `id-kochbuch-recipes` user (rows of `recipes` only);
-- the `kochbuch-deploy` user (DDL in `recipes` only).
+- the `recipes` and `shopping` schemas;
+- the `id-kochbuch-recipes` and `id-kochbuch-shopping` users (rows of their own schema only, denied the others);
+- the `kochbuch-deploy` user (tables in `recipes` and `shopping` only).
 
 The user names must match the `sqlUsers` output and the deploy app registration's name (step 4).
 

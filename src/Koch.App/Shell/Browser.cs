@@ -20,4 +20,9 @@ public sealed class Browser(IJSRuntime js)
 
     [JSInvokable]
     public Task OnVisible() => visible?.Invoke() ?? Task.CompletedTask;
+
+    /// <summary>While cooking; where the browser has no wake lock, the screen sleeps as usual.</summary>
+    public Task KeepScreenOnAsync() => js.InvokeVoidAsync("koch.keepScreenOn").AsTask();
+
+    public Task LetScreenSleepAsync() => js.InvokeVoidAsync("koch.letScreenSleep").AsTask();
 }

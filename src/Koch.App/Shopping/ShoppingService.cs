@@ -1,56 +1,39 @@
-using Koch.App.Recipes;
 using Koch.App.Shell;
-using Koch.Kernel;
 using Koch.Recipes.Domain.Cooking;
 using Koch.Shopping.Domain;
 
 namespace Koch.App.Shopping;
 
-/// <summary>A recipe chosen for a list, with the servings it is to be made for.</summary>
-public sealed record Choice(Recipe Recipe, int Servings);
-
 /// <summary>
-/// What the shopping pages may read and do. This is where recipes meet lists: the app turns the chosen recipes into
-/// planned lines (scaled to the servings, with the catalogue's aisle), and the shopping domain puts them on the list.
-/// The Shopping service never sees a recipe (docs/adr/0005).
+/// What the shopping pages may read and do. This is where recipes meet the list: the app turns a recipe into planned
+/// lines scaled to the servings, and the shopping domain puts them on the one list (docs/adr/0005, 0014). The Shopping
+/// service never sees a recipe.
 /// </summary>
-public sealed class ShoppingService(ShoppingState state, RecipeService recipes, TimeProvider clock)
+public sealed class ShoppingService(ShoppingState state)
 {
     private ShoppingBook Book => state.Data.Book;
 
-    /// <summary>Newest first.</summary>
-    public IReadOnlyList<ShoppingList> Lists => [.. Book.Lists.OrderByDescending(l => l.Created)];
+    /// <summary>What is still to buy first, by name.</summary>
+    public IReadOnlyList<ShoppingLine> Lines => Book.Lines();
 
-    public ShoppingList? Find(Guid id) => Book.Find(id);
+    /// <summary>How many lines are still to buy.</summary>
+    public int Open => Lines.Count(l => !l.Checked);
 
-    /// <summary>In the order of a walk through the shop, by the catalogue's current aisles.</summary>
-    public IReadOnlyList<ShoppingLine> Lines(Guid listId) => Book.Lines(listId, recipes.AisleOf);
+    /// <summary>The recipes something is still to be bought for.</summary>
+    public IReadOnlyList<string> OpenRecipes => Book.OpenRecipes;
 
-    /// <returns>The new list's id.</returns>
-    public Guid NewList(string? title = null)
-    {
-        var now = clock.GetUtcNow();
-        var list = new ShoppingList(Guid.NewGuid(), title ?? $"Einkauf {TimeZoneInfo.ConvertTime(now, clock.LocalTimeZone):dd.MM.}", now);
-        state.Change(data => data.Change(b => b.Save(list)));
-        return list.Id;
-    }
-
-    /// <summary>Every ingredient line of the chosen recipes, scaled to their servings.</summary>
-    public void Add(Guid listId, IEnumerable<Choice> choices)
-    {
-        var lines = choices.SelectMany(c => c.Recipe.LinesFor(c.Servings).Select(l =>
-            new PlannedLine(l.Ingredient, l.Amount, recipes.AisleOf(l.Ingredient) ?? Aisle.Sonstiges, c.Recipe.Title))).ToList();
-        state.Change(data => data.Change(b => b.Add(listId, lines, Guid.NewGuid)));
-    }
+    /// <summary>Every ingredient line of the recipe, scaled to <paramref name="servings"/>.</summary>
+    public void Add(Recipe recipe, int servings) => Change(b => b.Add(
+        recipe.LinesFor(servings).Select(l => new PlannedLine(l.Ingredient, l.Amount, recipe.Title)), Guid.NewGuid));
 
     /// <summary>Something not from a recipe: "Milch".</summary>
-    public void AddByHand(Guid listId, string name) => state.Change(data => data.Change(b =>
-        b.Add(listId, [new PlannedLine(name, null, recipes.AisleOf(name) ?? Aisle.Sonstiges, null)], Guid.NewGuid)));
+    public void AddByHand(string name) => Change(b => b.Add([new PlannedLine(name, null, null)], Guid.NewGuid));
 
-    public void Check(Guid listId, string key, bool isChecked) =>
-        state.Change(data => data.Change(b => b.Check(listId, key, isChecked)));
+    public void Check(string key, bool isChecked) => Change(b => b.Check(key, isChecked));
 
-    public void RemoveChecked(Guid listId) => state.Change(data => data.Change(b => b.RemoveChecked(listId)));
+    public void RemoveChecked() => Change(b => b.RemoveChecked());
 
-    public void RemoveList(Guid listId) => state.Change(data => data.Change(b => b.RemoveList(listId)));
+    public void Clear() => Change(_ => ShoppingBook.Empty);
+
+    private void Change(Func<ShoppingBook, ShoppingBook> change) => state.Change(data => data.Change(change));
 }

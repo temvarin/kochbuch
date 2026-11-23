@@ -18,7 +18,7 @@ public static class Known
         new Guid("3c9e8f10-5a1b-4c2d-8e3f-4a5b6c7d8e9f"));
 
     public static RecipeBook Book() =>
-        RecipeBook.Empty.Save(Soup()).Save(new Ingredient("Kartoffeln", Aisle.ObstGemuese));
+        RecipeBook.Empty.Save(Soup());
 
     public static Recipe Recipe(Guid id, string title = "Rezept", int servings = 2, params RecipeLine[] lines) =>
         new(id, title, servings, lines, []);
