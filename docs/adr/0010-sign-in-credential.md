@@ -1,6 +1,6 @@
 # ADR-0010: How Easy Auth proves itself to Entra: a federated managed identity, a client secret as fallback, no Key Vault
 
-**Status:** Proposed (2026-11-22). Decided on the first deployment, when step 2.4 of `docs/deployment.md` shows whether
+**Status:** Proposed (2026-11-22). Decided on the first deployment, when step 5 of `docs/deployment.md` shows whether
 the managed identity works.
 
 ## Context

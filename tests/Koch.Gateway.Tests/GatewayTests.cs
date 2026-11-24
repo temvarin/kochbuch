@@ -149,6 +149,7 @@ public sealed class GatewayTests(WebApplicationFactory<Program> factory) : IClas
 
         Assert.Contains("script-src 'self' 'wasm-unsafe-eval'", response.Headers.GetValues("Content-Security-Policy").Single());
         Assert.Equal("DENY", response.Headers.GetValues("X-Frame-Options").Single());
+        Assert.StartsWith("max-age=", response.Headers.GetValues("Strict-Transport-Security").Single(), StringComparison.Ordinal);
         Assert.True(response.Headers.CacheControl?.NoStore);
     }
 

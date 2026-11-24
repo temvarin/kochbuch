@@ -18,6 +18,10 @@ public static class SecurityHeaders
             "form-action 'self'; frame-ancestors 'none'";
         headers.XContentTypeOptions = "nosniff";
         headers.XFrameOptions = "DENY";
+        // Never over plain HTTP again once the phone has seen the site (browsers ignore it on http://localhost).
+        headers.StrictTransportSecurity = "max-age=31536000";
+        // Other sites don't learn which recipe page a link was followed from.
+        headers["Referrer-Policy"] = "same-origin";
         // The household's data, so neither the browser nor anything in between may keep a copy of an API answer.
         if (context.Request.Path.StartsWithSegments("/api")) headers.CacheControl = "no-store";
         return next(context);

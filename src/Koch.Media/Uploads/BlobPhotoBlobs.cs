@@ -22,7 +22,12 @@ public sealed class BlobPhotoBlobs(BlobServiceClient service) : IPhotoBlobs
             var properties = await blob.GetPropertiesAsync(cancellationToken: cancellationToken);
             // Checked before downloading: a SAS can't limit the size of an upload.
             if (properties.Value.ContentLength > PhotoPaths.MaxUploadBytes) return new byte[PhotoPaths.MaxUploadBytes + 1];
-            var content = await blob.DownloadContentAsync(cancellationToken);
+            // The SAS allows writing until it expires, so the blob could be replaced after the check: only the checked
+            // version is downloaded. If it was replaced, this throws and the retry checks the new one.
+            var content = await blob.DownloadContentAsync(new BlobDownloadOptions
+            {
+                Conditions = new BlobRequestConditions { IfMatch = properties.Value.ETag },
+            }, cancellationToken);
             return content.Value.Content.ToArray();
         }
         catch (RequestFailedException e) when (e.Status == 404)

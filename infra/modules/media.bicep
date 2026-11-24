@@ -65,4 +65,18 @@ resource app 'Microsoft.Web/sites@2024-04-01' = {
   }
 }
 
+// CI deploys with its Entra identity (OIDC), so the publishing user name and password the platform would otherwise
+// create for FTP and the deployment endpoint (scm) are switched off: no password exists that could deploy code.
+resource noFtpPassword 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2024-04-01' = {
+  parent: app
+  name: 'ftp'
+  properties: { allow: false }
+}
+
+resource noScmPassword 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2024-04-01' = {
+  parent: app
+  name: 'scm'
+  properties: { allow: false }
+}
+
 output name string = app.name
