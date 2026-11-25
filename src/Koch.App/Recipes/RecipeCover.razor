@@ -1,0 +1,25 @@
+@* A recipe's picture: its photo, or a tile with its initial in one of the app's colours, the same on every phone. The
+   tile also stands in while a new photo is still being prepared. *@
+@if (Recipe.Photo is { } photo)
+{
+    <RecipePhoto Photo="photo" Width="Width" Alt="@Alt" Class="cover" Fallback="Tile" />
+}
+else
+{
+    @Tile
+}
+
+@code {
+    [Parameter, EditorRequired] public Recipe Recipe { get; set; } = default!;
+
+    /// <summary>400 for tiles, 1200 for the recipe page (Koch.Media.Contracts.PhotoPaths.Widths).</summary>
+    [Parameter] public int Width { get; set; } = 400;
+
+    /// <summary>Empty when the title is written next to it anyway.</summary>
+    [Parameter] public string Alt { get; set; } = "";
+
+    private RenderFragment Tile => @<div class="cover tile-@Tone" role="img" aria-label="@Alt"><span aria-hidden="true">@Recipe.Title[..1].ToUpperInvariant()</span></div>;
+
+    // From the id, so a recipe keeps its colour: gold, ink or white.
+    private int Tone => (int)((uint)Recipe.Id.GetHashCode() % 3);
+}

@@ -1,0 +1,6 @@
+@page "/nicht-gefunden"
+@layout MainLayout
+@inject AppText Text
+
+<TopBar Title="@Text.Pick("Nicht gefunden", "Страница не найдена")" Back="" />
+<p class="empty">@Text.Pick("Diese Seite gibt es nicht.", "Такой страницы нет.") <a href="">@Text.Pick("Zu den Rezepten", "К рецептам")</a></p>

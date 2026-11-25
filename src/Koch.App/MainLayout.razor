@@ -1,0 +1,42 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject Browser Browser
+@inject SyncOverview Sync
+@inject UnitNames Names
+@inject AppText Text
+
+<header class="topbar">
+    <SectionOutlet SectionName="@TopBar.Section" />
+</header>
+<main>
+    @Body
+</main>
+<nav class="tabbar" aria-label="@Text.Pick("Bereiche", "Разделы")">
+    <NavLink href="" Match="NavLinkMatch.All"><span class="tab-icon"><Icon Name="book" /></span>@Text.Pick("Rezepte", "Рецепты")</NavLink>
+    <NavLink href="einkauf"><span class="tab-icon"><Icon Name="cart" /></span>@Text.Pick("Einkauf", "Покупки")</NavLink>
+</nav>
+
+@code {
+    protected override void OnInitialized() => Names.Changed += OnLanguageChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Browser.SetLangAsync(Text.LangCode);
+        _ = Browser.ProtectStorageAsync();
+        await Browser.WhenVisibleAsync(Sync.ResumeAsync);
+        await Sync.StartAsync();
+    }
+
+    private void OnLanguageChanged() => _ = InvokeAsync(async () =>
+    {
+        await Browser.SetLangAsync(Text.LangCode);
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Names.Changed -= OnLanguageChanged;
+        GC.SuppressFinalize(this);
+    }
+}

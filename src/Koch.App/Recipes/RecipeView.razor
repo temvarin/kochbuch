@@ -1,0 +1,117 @@
+@page "/rezept/{Id:guid}"
+@inherits LiveComponent
+@inject RecipeService Recipes
+@inject ShoppingService Shopping
+@inject NavigationManager Nav
+@inject UnitNames Names
+@inject AppText Text
+
+@if (Recipe is not { } recipe)
+{
+    <TopBar Title="@Text.Pick("Rezept", "Рецепт")" Back="" />
+    <p class="empty">@Text.Pick("Dieses Rezept gibt es nicht (mehr).", "Этого рецепта больше нет.") <a href="">@Text.Pick("Zu den Rezepten", "К рецептам")</a></p>
+}
+else
+{
+    <PageTitle>@Text.PageTitle(recipe.Title)</PageTitle>
+    <div class="hero">
+        <RecipeCover Recipe="recipe" Width="1200" Alt="@Text.PhotoAlt(recipe.Title)" />
+        <a class="round-btn back" href="" aria-label="@Text.Pick("Zurück", "Назад")"><Icon Name="back" /></a>
+        <MoreMenu Label="@Text.Pick("Mehr: Bearbeiten, Löschen", "Ещё: изменить, удалить")" Class="on-hero">
+            <a href="rezept/@recipe.Id/bearbeiten" data-testid="edit">@Text.Pick("Bearbeiten", "Изменить")</a>
+            @if (confirmRemove)
+            {
+                <button type="button" class="danger" data-testid="remove-confirm" @onclick="() => Remove(recipe.Id)">@Text.Pick("Wirklich löschen", "Точно удалить?")</button>
+            }
+            else
+            {
+                <button type="button" class="danger" data-testid="remove" @onclick="() => confirmRemove = true" @onclick:stopPropagation>@Text.Pick("Löschen", "Удалить")</button>
+            }
+        </MoreMenu>
+    </div>
+    <h1 class="display recipe-title">@recipe.Title</h1>
+    <SyncBanner />
+
+    <div class="servings">
+        <span>@Text.Pick("Für", "На")</span>
+        <div class="stepper">
+            <button class="icon-btn" aria-label="@Text.Pick("Weniger Portionen", "Меньше порций")" disabled="@(Servings <= 1)" @onclick="() => servings = Servings - 1">−</button>
+            <output data-testid="servings">@Text.Servings(Servings)</output>
+            <button class="icon-btn" aria-label="@Text.Pick("Mehr Portionen", "Больше порций")" disabled="@(Servings >= Recipe.MaxServings)" @onclick="() => servings = Servings + 1">+</button>
+        </div>
+    </div>
+
+    <h2 class="display">@Text.Pick("Zutaten", "Ингредиенты")</h2>
+    @if (recipe.Lines.Count == 0)
+    {
+        <p class="empty">@Text.Pick("Keine Zutaten eingetragen.", "Ингредиенты не указаны.")</p>
+    }
+    else
+    {
+        <ul class="ingredients" data-testid="ingredients">
+            @foreach (var line in recipe.LinesFor(Servings))
+            {
+                <li class="ingredient">
+                    <span class="amount">@(line.Amount is { } q ? Names.Quantity(q) : "–")</span>
+                    <span>@line.Ingredient@(line.Note.Length > 0 ? $", {line.Note}" : "")</span>
+                </li>
+            }
+        </ul>
+    }
+
+    <h2 class="display">@Text.Pick("Zubereitung", "Приготовление")</h2>
+    @if (recipe.Steps.Count == 0)
+    {
+        <p class="empty">@Text.Pick("Keine Schritte eingetragen.", "Шаги приготовления не указаны.")</p>
+    }
+    else
+    {
+        <ol class="steps">
+            @foreach (var step in recipe.Steps)
+            {
+                <li>@step</li>
+            }
+        </ol>
+    }
+
+    @if (recipe.Notes.Length > 0)
+    {
+        <h2 class="display">@Text.Pick("Notizen", "Заметки")</h2>
+        <p class="notes">@recipe.Notes</p>
+    }
+
+    <div class="action-bar">
+        @if (added == Servings)
+        {
+            <a class="btn" href="einkauf" data-testid="on-list"><Icon Name="check" />@Text.Pick("Auf der Liste", "В списке")</a>
+        }
+        else
+        {
+            <button class="btn" data-testid="add-to-list" @onclick="() => AddToList(recipe)"><Icon Name="plus" />@Text.Pick("Auf die Liste", "В список")</button>
+        }
+        <a class="btn primary" href="rezept/@recipe.Id/kochen?portionen=@Servings" data-testid="cook"><Icon Name="play" />@Text.Pick("Kochen", "Готовить")</a>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private int? servings, added;
+    private bool confirmRemove;
+
+    private Recipe? Recipe => Recipes.Find(Id);
+
+    private int Servings => servings ?? Recipe?.Servings ?? 1;
+
+    private void AddToList(Recipe recipe)
+    {
+        Shopping.Add(recipe, Servings);
+        added = Servings;
+    }
+
+    private void Remove(Guid id)
+    {
+        Recipes.Remove(id);
+        Nav.NavigateTo("");
+    }
+}

@@ -1,0 +1,79 @@
+@page "/rezept/{Id:guid}/kochen"
+@implements IAsyncDisposable
+@inject RecipeService Recipes
+@inject Browser Browser
+@inject NavigationManager Nav
+@inject UnitNames Names
+@inject AppText Text
+
+@if (Recipe is not { } recipe || recipe.Steps.Count == 0)
+{
+    <TopBar Title="@Text.Pick("Kochen", "Приготовление")" Back="@($"rezept/{Id}")" />
+    <p class="empty">@Text.Pick("Für dieses Rezept sind keine Schritte eingetragen.", "Для этого рецепта не добавлены шаги.")</p>
+}
+else
+{
+    var step = recipe.Steps[index];
+    <PageTitle>@Text.CookPageTitle(recipe.Title)</PageTitle>
+    <div class="cook">
+        <div class="cook-head">
+            <span class="muted">@recipe.Title · @Text.Servings(Servings)</span>
+            <a class="icon-btn" href="rezept/@recipe.Id" aria-label="@Text.Pick("Kochen beenden", "Завершить приготовление")"><Icon Name="close" /></a>
+        </div>
+        <div class="progress" role="img" aria-label="@Text.StepOf(index + 1, recipe.Steps.Count)">
+            @for (var i = 0; i < recipe.Steps.Count; i++)
+            {
+                <span class="@(i < index ? "done" : i == index ? "now" : "")"></span>
+            }
+        </div>
+
+        <p class="display step-count">@Text.StepOf(index + 1, recipe.Steps.Count)</p>
+        <p class="step-text" data-testid="step-text">@step</p>
+
+        @if (Needed(recipe, step) is { Count: > 0 } needed)
+        {
+            <h2 class="label">@Text.Pick("Dafür", "Для этого шага")</h2>
+            <ul class="chips" data-testid="needed">
+                @foreach (var line in needed)
+                {
+                    <li>@(line.Amount is { } q ? $"{Names.Quantity(q)} " : "")@line.Ingredient</li>
+                }
+            </ul>
+        }
+
+        <p class="hint">@Text.Pick("Der Bildschirm bleibt an, solange gekocht wird.", "Экран не погаснет, пока вы готовите.")</p>
+        <div class="cook-nav">
+            <button class="btn" disabled="@(index == 0)" @onclick="() => index--">@Text.Pick("Zurück", "Назад")</button>
+            @if (index < recipe.Steps.Count - 1)
+            {
+                <button class="btn primary" data-testid="next" @onclick="() => index++">@Text.Pick("Weiter", "Дальше")</button>
+            }
+            else
+            {
+                <a class="btn primary" href="rezept/@recipe.Id" data-testid="done">@Text.Pick("Fertig", "Готово")</a>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [SupplyParameterFromQuery(Name = "portionen")] public int? Portionen { get; set; }
+
+    private int index;
+
+    private Recipe? Recipe => Recipes.Find(Id);
+
+    private int Servings => Portionen is >= 1 and <= Recipe.MaxServings ? Portionen.Value : Recipe?.Servings ?? 1;
+
+    private IReadOnlyList<RecipeLine> Needed(Recipe recipe, string step) =>
+        [.. recipe.LinesFor(Servings).Where(l => step.Contains(l.Ingredient, StringComparison.OrdinalIgnoreCase))];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.KeepScreenOnAsync();
+    }
+
+    public async ValueTask DisposeAsync() => await Browser.LetScreenSleepAsync();
+}

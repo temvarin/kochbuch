@@ -1,0 +1,72 @@
+@page "/konto"
+@inherits LiveComponent
+@inject AccountService Account
+@inject SyncOverview Sync
+@inject NavigationManager Nav
+@inject TimeProvider Clock
+@inject UnitNames Names
+@inject AppText Text
+
+<TopBar Title="@Text.Pick("Konto und Abgleich", "Аккаунт и синхронизация")" Back="" />
+
+<section class="card">
+    @switch (Account.Status)
+    {
+        case AccountStatus.SignedIn:
+            <div class="setting"><span>@Text.Pick("Angemeldet als", "Вы вошли как")</span><span class="account">@Account.Me!.Name</span></div>
+            break;
+        case AccountStatus.NotMember:
+            @if (Text.IsRussian)
+            {
+                <p>Вы вошли как <strong>@Account.Me!.Name</strong>, но доступ ещё не открыт.</p>
+                <p class="hint">Ваш ID для списка участников: <code>@Account.Me.Id</code></p>
+            }
+            else
+            {
+                <p>Angemeldet als <strong>@Account.Me!.Name</strong>, aber noch nicht freigeschaltet.</p>
+                <p class="hint">Deine Id für die Mitgliederliste: <code>@Account.Me.Id</code></p>
+            }
+            break;
+        case AccountStatus.SignedOut:
+            <p>@Text.Pick("Nicht angemeldet. Rezepte bleiben auf diesem Handy, bis du dich anmeldest.", "Вы не вошли в аккаунт. Рецепты останутся на этом телефоне, пока вы не войдёте.")</p>
+            <button class="btn primary" @onclick="SignIn">@Text.Pick("Anmelden", "Войти")</button>
+            break;
+        case AccountStatus.Unreachable:
+            <p>@Text.Pick("Keine Verbindung. Alles, was du änderst, bleibt auf dem Handy und wird später abgeglichen.", "Нет подключения. Все изменения сохранятся на телефоне и синхронизируются позже.")</p>
+            break;
+        default:
+            <p class="muted">@Text.Pick("Wird geprüft …", "Проверка…")</p>
+            break;
+    }
+</section>
+
+@if (Account.Status == AccountStatus.SignedIn)
+{
+    <section class="card">
+        <div class="setting">
+            <span>@Text.Pick("Abgleich", "Синхронизация")</span>
+            <span data-testid="sync-status">@Text.DescribeSync(Sync, Clock.GetUtcNow())</span>
+        </div>
+        <button class="btn" disabled="@(Sync.Status == SyncStatus.Syncing || !Sync.CanSync)" @onclick="Sync.SyncNowAsync">
+            @Text.Pick("Jetzt abgleichen", "Синхронизировать")
+        </button>
+    </section>
+}
+
+@* Each phone picks its own language and units; recipes and shopping items stay language-neutral. *@
+<section class="card">
+    <label class="field">
+        <span>@Text.Pick("Sprache", "Язык")</span>
+        <select @bind:get="Names.Language" @bind:set="Names.Choose" data-testid="unit-language">
+            <option value="@UnitLanguage.German">Deutsch (g, EL, Stück)</option>
+            <option value="@UnitLanguage.Russian" lang="ru">Русский (г, ст. л., шт.)</option>
+        </select>
+    </label>
+    <p class="hint">@Text.Pick(
+        "Gilt nur auf diesem Handy. Rezepte und Liste bleiben dieselben; jedes Handy zeigt Oberfläche und Einheiten in seiner Sprache.",
+        "Действует только на этом телефоне. Рецепты и список покупок общие — каждый телефон показывает интерфейс и меры на своём языке.")</p>
+</section>
+
+@code {
+    private void SignIn() => Nav.NavigateTo(AccountService.SignInUrl, forceLoad: true);
+}

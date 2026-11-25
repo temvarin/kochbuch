@@ -1,0 +1,91 @@
+@page "/einkauf"
+@inherits LiveComponent
+@inject ShoppingService Shopping
+@inject AppText Text
+
+<PageTitle>@Text.PageTitle(Text.Pick("Einkaufsliste", "Список покупок"))</PageTitle>
+@{
+    var lines = Shopping.Lines;
+}
+
+<div class="page-head">
+    <div class="title-row">
+        <h1 class="display">@Text.Pick("Einkaufsliste", "Список покупок")</h1>
+        @if (lines.Count > 0)
+        {
+            <MoreMenu Label="@Text.Pick("Mehr: Erledigte leeren, Liste leeren", "Ещё: убрать купленное, очистить список")">
+                <button type="button" data-testid="remove-checked" disabled="@(!lines.Any(l => l.Checked))" @onclick="Shopping.RemoveChecked">@Text.Pick("Erledigte leeren", "Убрать купленное")</button>
+                @if (confirmClear)
+                {
+                    <button type="button" class="danger" data-testid="clear-confirm" @onclick="Clear">@Text.Pick("Wirklich alles leeren", "Точно очистить всё?")</button>
+                }
+                else
+                {
+                    <button type="button" class="danger" data-testid="clear" @onclick="() => confirmClear = true" @onclick:stopPropagation>@Text.Pick("Liste leeren", "Очистить список")</button>
+                }
+            </MoreMenu>
+        }
+    </div>
+    @if (Shopping.OpenRecipes.Count > 0)
+    {
+        <p class="muted" data-testid="for">@Text.ForRecipes(Shopping.OpenRecipes)</p>
+    }
+</div>
+<SyncBanner />
+
+<form class="add-line" @onsubmit="AddByHand">
+    <label class="field">
+        <span class="visually-hidden">@Text.Pick("Noch etwas", "Добавить ещё")</span>
+        <input @bind="byHand" placeholder="@Text.Pick("Noch etwas, z. B. Milch", "Добавить ещё, например молоко")" maxlength="@Koch.Domain.Shopping.ShoppingItem.MaxName" data-testid="by-hand" />
+    </label>
+    <button type="submit" class="btn primary" aria-label="@Text.Pick("Hinzufügen", "Добавить")"><Icon Name="plus" /></button>
+</form>
+
+@if (lines.Count == 0)
+{
+    <p class="empty">@Text.Pick(
+        "Die Liste ist leer. Auf einer Rezeptseite kommt mit „Auf die Liste“ alles darauf, was das Rezept braucht.",
+        "Список пуст. Откройте рецепт и нажмите «В список», чтобы добавить нужные продукты.")</p>
+}
+else
+{
+    <section class="card list shopping-card">
+        @if (lines.Any(l => !l.Checked))
+        {
+            <ul class="shopping" data-testid="open">
+                @foreach (var line in lines.Where(l => !l.Checked))
+                {
+                    <li><ShoppingLineView Line="line" OnToggle="() => Shopping.Check(line.Key, true)" /></li>
+                }
+            </ul>
+        }
+        @if (lines.Any(l => l.Checked))
+        {
+            <h2 class="in-trolley">@Text.InTrolley(lines.Count(l => l.Checked))</h2>
+            <ul class="shopping" data-testid="checked">
+                @foreach (var line in lines.Where(l => l.Checked))
+                {
+                    <li><ShoppingLineView Line="line" OnToggle="() => Shopping.Check(line.Key, false)" /></li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+@code {
+    private string byHand = "";
+    private bool confirmClear;
+
+    private void AddByHand()
+    {
+        if (byHand.Trim().Length == 0) return;
+        Shopping.AddByHand(byHand);
+        byHand = "";
+    }
+
+    private void Clear()
+    {
+        Shopping.Clear();
+        confirmClear = false;
+    }
+}

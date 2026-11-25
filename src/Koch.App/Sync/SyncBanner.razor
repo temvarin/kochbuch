@@ -1,0 +1,32 @@
+@inherits LiveComponent
+@inject AccountService Account
+@inject SyncOverview Sync
+@inject NavigationManager Nav
+@inject AppText Text
+
+@switch (Account.Status)
+{
+    case AccountStatus.SignedOut:
+        <button class="banner" data-testid="sign-in" @onclick="SignIn">
+            <span>@Text.Pick("Anmelden, damit eure Rezepte auf beiden Handys gleich sind", "Войдите, чтобы рецепты синхронизировались на обоих телефонах")</span>→
+        </button>
+        break;
+    case AccountStatus.NotMember:
+        <a class="banner" href="konto"><span>@Text.Pick("Dein Konto ist noch nicht freigeschaltet", "Вашему аккаунту ещё не открыт доступ")</span>→</a>
+        break;
+    case AccountStatus.SignedIn when Sync.Status == SyncStatus.Failed:
+        <a class="banner" href="konto"><span>@Text.Pick("Abgleich fehlgeschlagen – die Änderungen bleiben auf dem Handy", "Не удалось синхронизировать — изменения сохранены на телефоне")</span>→</a>
+        break;
+    case AccountStatus.SignedIn when Sync.Status == SyncStatus.Outdated:
+        <button class="banner" @onclick="Reload"><span>@Text.Pick("Neue Version – bitte neu laden", "Вышла новая версия — обновите страницу")</span>↻</button>
+        break;
+    case AccountStatus.SignedIn when Sync.Status == SyncStatus.Refused:
+        <a class="banner" href="konto"><span>@Text.Pick("Der Abgleich wurde abgelehnt", "Синхронизация отклонена")</span>→</a>
+        break;
+}
+
+@code {
+    private void SignIn() => Nav.NavigateTo(AccountService.SignInUrl, forceLoad: true);
+
+    private void Reload() => Nav.NavigateTo(Nav.Uri, forceLoad: true);
+}

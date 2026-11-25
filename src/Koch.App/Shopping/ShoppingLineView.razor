@@ -1,0 +1,23 @@
+@inject UnitNames Names
+@inject AppText Text
+
+<button type="button" class="line shopping-line @(Line.Checked ? "done" : "")" role="checkbox" aria-checked="@(Line.Checked ? "true" : "false")" aria-label="@($"{Line.Name} {Amount}".Trim())"
+        data-testid="line" @onclick="OnToggle">
+    <span class="tick" aria-hidden="true">@(Line.Checked ? "✓" : "")</span>
+    <span class="name">
+        <b>@Line.Name</b>
+        @if (Line.Recipes.Count > 0)
+        {
+            <span class="for">@Text.ForRecipesInline(Line.Recipes)</span>
+        }
+    </span>
+    <span class="amount" data-testid="amount">@Amount</span>
+</button>
+
+@code {
+    [Parameter, EditorRequired] public Koch.Domain.Shopping.ShoppingLine Line { get; set; } = default!;
+
+    [Parameter] public EventCallback OnToggle { get; set; }
+
+    private string Amount => string.Join(" + ", (Line.Checked ? Line.Total : Line.Missing).Select(Names.Quantity));
+}

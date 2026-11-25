@@ -1,0 +1,18 @@
+@* Rare actions (edit, delete, empty the list) behind "⋯", so they don't compete with the page's main action. The
+   browser's own disclosure element, so keyboard and screen readers know it; it closes after an action is chosen. A
+   button that only asks for confirmation stops its click (@onclick:stopPropagation) to keep the menu open. *@
+<details class="more @Class" open="@open">
+    <summary aria-label="@Label" @onclick="() => open = !open" @onclick:preventDefault><Icon Name="more" /></summary>
+    <div class="more-menu" @onclick="() => open = false">@ChildContent</div>
+</details>
+
+@code {
+    /// <summary>What the button says to a screen reader, e.g. "Mehr: Bearbeiten, Löschen".</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    [Parameter] public string Class { get; set; } = "";
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool open;
+}

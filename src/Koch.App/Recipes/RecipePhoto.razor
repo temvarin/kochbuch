@@ -1,0 +1,34 @@
+@inject AppText Text
+
+@if (missing && Fallback is not null)
+{
+    @Fallback
+}
+else if (missing)
+{
+    <div class="@Class placeholder" aria-label="@Alt" role="img">@Text.Pick("Das Foto wird noch vorbereitet.", "Фото ещё обрабатывается.")</div>
+}
+else
+{
+    <img class="@Class" src="@PhotoService.Url(Photo, Width)" alt="@Alt" loading="lazy" @onerror="() => missing = true" data-testid="photo" />
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid Photo { get; set; }
+
+    [Parameter, EditorRequired] public int Width { get; set; }
+
+    [Parameter] public string Alt { get; set; } = "";
+
+    [Parameter] public string Class { get; set; } = "photo";
+
+    [Parameter] public RenderFragment? Fallback { get; set; }
+
+    private bool missing;
+    private Guid shown;
+
+    protected override void OnParametersSet()
+    {
+        if (shown != Photo) (missing, shown) = (false, Photo);
+    }
+}

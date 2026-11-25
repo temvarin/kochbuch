@@ -1,0 +1,71 @@
+@page "/"
+@inherits LiveComponent
+@inject RecipeService Recipes
+@inject ShoppingService Shopping
+@inject SyncOverview Sync
+@inject AccountService Account
+@inject TimeProvider Clock
+@inject AppText Text
+
+<PageTitle>@Text.PageTitle(Text.Pick("Rezepte", "Рецепты"))</PageTitle>
+
+<div class="page-head">
+    <div class="status-row">
+        @if (Account.Status == AccountStatus.SignedIn)
+        {
+            <span class="sync-line" data-testid="sync-line">@Text.DescribeSync(Sync, Clock.GetUtcNow())</span>
+        }
+        <a class="icon-btn" href="konto" aria-label="@Text.Pick("Konto und Abgleich", "Аккаунт и синхронизация")"><Icon Name="user" /></a>
+    </div>
+    <h1 class="display">@Text.Pick("Was kochen wir heute?", "Что приготовим сегодня?")</h1>
+</div>
+<SyncBanner />
+
+@if (Recipes.All.Count == 0)
+{
+    <p class="empty">@Text.Pick("Noch keine Rezepte. Das erste ist schnell angelegt: unten rechts auf +.", "Рецептов пока нет. Нажмите + внизу справа, чтобы добавить первый.")</p>
+}
+else
+{
+    <label class="search">
+        <Icon Name="search" />
+        <input type="search" placeholder="@Text.Pick("Rezept oder Zutat suchen", "Поиск по рецепту или ингредиенту")" aria-label="@Text.Pick("Suchen", "Поиск")" @bind="search" @bind:event="oninput" data-testid="search" />
+    </label>
+    @if (Found.Count == 0)
+    {
+        <p class="empty">@Text.Pick("Nichts gefunden.", "Ничего не найдено.")</p>
+    }
+    else
+    {
+        <ul class="tiles">
+            @foreach (var recipe in Found)
+            {
+                <li>
+                    <a class="tile" href="rezept/@recipe.Id">
+                        <RecipeCover Recipe="recipe" />
+                        <b>@recipe.Title</b>
+                        <span class="muted">@Text.Servings(recipe.Servings)</span>
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+}
+
+<div class="dock">
+    <a class="list-bar" href="einkauf" data-testid="list-bar">
+        <Icon Name="list" />
+        <span>@Text.Pick("Einkaufsliste", "Список покупок")</span>
+        <span class="count">@Text.OpenItems(Shopping.Open)</span>
+    </a>
+    <a class="fab" href="rezept/neu" aria-label="@Text.Pick("Neues Rezept", "Новый рецепт")"><Icon Name="plus" /></a>
+</div>
+
+@code {
+    private string search = "";
+
+    private IReadOnlyList<Recipe> Found => search.Trim() is { Length: > 0 } term
+        ? [.. Recipes.All.Where(r => r.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || r.Lines.Any(l => l.Ingredient.Contains(term, StringComparison.OrdinalIgnoreCase)))]
+        : Recipes.All;
+}

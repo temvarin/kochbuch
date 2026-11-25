@@ -1,0 +1,198 @@
+@page "/rezept/neu"
+@page "/rezept/{Id:guid}/bearbeiten"
+@inject RecipeService Recipes
+@inject PhotoService Photos
+@inject NavigationManager Nav
+@inject UnitNames Names
+@inject AppText Text
+
+<TopBar Title="@(Id is null ? Text.Pick("Neues Rezept", "Новый рецепт") : Text.Pick("Rezept bearbeiten", "Редактировать рецепт"))" Back="@(Id is { } id ? $"rezept/{id}" : "")" />
+
+@if (draft is null)
+{
+    <p class="empty">@Text.Pick("Dieses Rezept gibt es nicht (mehr).", "Этого рецепта больше нет.") <a href="">@Text.Pick("Zu den Rezepten", "К рецептам")</a></p>
+}
+else
+{
+    <div class="recipe-form">
+        <label class="field">
+            <span>@Text.Pick("Name", "Название")</span>
+            <input @bind="draft.Title" maxlength="@Recipe.MaxTitle" placeholder="@Text.Pick("z. B. Kartoffelsuppe", "Например, борщ")" data-testid="title" />
+        </label>
+        <label class="field">
+            <span>@Text.Pick("Portionen", "Порции")</span>
+            <input type="number" min="1" max="@Recipe.MaxServings" @bind="draft.Servings" data-testid="servings" />
+        </label>
+
+        <h2 class="display">@Text.Pick("Zutaten", "Ингредиенты")</h2>
+        @if (draft.Lines.Count > 0)
+        {
+            <ul class="card list edit-lines" data-testid="lines">
+                @foreach (var line in draft.Lines)
+                {
+                    <li>
+                        <button type="button" class="line" aria-label="@Text.EditLabel(Shown(line))" @onclick="() => Edit(line)">
+                            <span class="amount">@(line.Amount is { } q ? Names.Quantity(q) : "–")</span>
+                            <span class="name">@line.Ingredient@(line.Note.Length > 0 ? $", {line.Note}" : "")</span>
+                        </button>
+                        <button type="button" class="icon-btn" aria-label="@Text.RemoveLabel(line.Ingredient)" @onclick="() => draft.Lines.Remove(line)"><Icon Name="close" /></button>
+                    </li>
+                }
+            </ul>
+        }
+        <form class="add-line" @onsubmit="AddLine">
+            <fieldset class="line-fields">
+                <legend class="visually-hidden">@Text.Pick("Zutat hinzufügen", "Добавить ингредиент")</legend>
+                <label class="field">
+                    <span>@Text.Pick("Menge", "Кол-во")</span>
+                    <input @bind="draft.NewAmount" inputmode="decimal" placeholder="500" enterkeyhint="enter" data-testid="new-amount" />
+                </label>
+                <label class="field">
+                    <span>@Text.Pick("Einheit", "Мера")</span>
+                    <select @bind="draft.NewUnit" data-testid="new-unit">
+                        <option value="">–</option>
+                        @foreach (var unit in Units.InOrder)
+                        {
+                            <option value="@unit">@Names.Name(unit)</option>
+                        }
+                    </select>
+                </label>
+                <label class="field ingredient-field">
+                    <span>@Text.Pick("Zutat", "Ингредиент")</span>
+                    <input @bind="draft.NewIngredient" @bind:event="oninput" list="zutaten"
+                           placeholder="@Text.Pick("z. B. Kartoffeln, festkochend", "Например, картофель, молодой")"
+                           enterkeyhint="enter" data-testid="new-ingredient" />
+                </label>
+            </fieldset>
+            <button type="submit" class="btn primary" aria-label="@Text.Pick("Zutat übernehmen", "Добавить ингредиент")"><Icon Name="check" /></button>
+        </form>
+        <datalist id="zutaten">
+            @foreach (var name in Recipes.IngredientNames)
+            {
+                <option value="@name"></option>
+            }
+        </datalist>
+        <p class="hint">@Text.Pick(
+            "Menge und Einheit nur, wo nötig: „Salz“ ohne Menge heißt nach Geschmack. Nach dem Komma ein Hinweis.",
+            "Количество и меру указывайте по желанию: «соль» без количества — значит по вкусу. После запятой можно добавить пометку.")</p>
+
+        <h2 class="display">@Text.Pick("Zubereitung", "Приготовление")</h2>
+        @foreach (var (step, index) in draft.Steps.Select((s, i) => (s, i)))
+        {
+            <label class="field">
+                <span>@Text.StepLabel(index + 1)</span>
+                <textarea rows="3" @bind="step.Text" @bind:after="KeepEmptyStep" maxlength="@Recipe.MaxStep" data-testid="step"></textarea>
+            </label>
+        }
+
+        <label class="field">
+            <span>@Text.Pick("Notizen", "Заметки")</span>
+            <textarea rows="3" @bind="draft.Notes" maxlength="@Recipe.MaxNotes"></textarea>
+        </label>
+
+        <h2 class="display">@Text.Pick("Foto", "Фото")</h2>
+        <section class="card photo-edit">
+            @if (preview is not null)
+            {
+                <img class="photo" src="@preview" alt="@Text.Pick("Vorschau des gewählten Fotos", "Предпросмотр выбранного фото")" />
+            }
+            else if (draft.Photo is { } photo)
+            {
+                <RecipePhoto Photo="photo" Width="400" Alt="@Text.Pick("Foto des Rezepts", "Фото рецепта")" />
+            }
+            @if (uploading)
+            {
+                <p class="muted" role="status">@Text.Pick("Wird hochgeladen …", "Загружается…")</p>
+            }
+            @if (photoError is not null)
+            {
+                <p class="error" role="alert" data-testid="photo-error">@photoError</p>
+            }
+            <label class="btn">
+                @(draft.Photo is null ? Text.Pick("Foto wählen", "Выбрать фото") : Text.Pick("Anderes Foto", "Другое фото"))
+                <InputFile class="visually-hidden" accept="@PhotoService.Accept" OnChange="UploadPhoto" disabled="@uploading" data-testid="photo-input" />
+            </label>
+            @if (draft.Photo is not null && !uploading)
+            {
+                <button type="button" class="btn danger" @onclick="RemovePhoto">@Text.Pick("Foto entfernen", "Удалить фото")</button>
+            }
+        </section>
+
+        @if (error is not null)
+        {
+            <p class="error" role="alert" data-testid="error">@error</p>
+        }
+        <button type="button" class="btn primary" data-testid="save" @onclick="Save">@Text.Pick("Speichern", "Сохранить")</button>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private RecipeDraft? draft;
+    private string? error, photoError, preview;
+    private bool uploading;
+    private int attempts;
+
+    protected override void OnParametersSet()
+    {
+        draft = Id is { } id ? (Recipes.Find(id) is { } recipe ? RecipeDraft.From(recipe) : null) : new RecipeDraft();
+        (error, photoError, preview) = (null, null, null);
+    }
+
+    private string Shown(RecipeLine line) =>
+        $"{(line.Amount is { } q ? Names.Quantity(q) + " " : "")}{line.Ingredient}{(line.Note.Length > 0 ? $", {line.Note}" : "")}";
+
+    private void AddLine() => draft!.TryAddNewLine(out error, Names.Language);
+
+    private void Edit(RecipeLine line) => draft!.TryEdit(line, out error, Names.Language);
+
+    private async Task UploadPhoto(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        var attempt = ++attempts;
+        (photoError, preview, uploading) = (null, null, true);
+        _ = ShowPreviewAsync(file, attempt);
+        try
+        {
+            draft!.Photo = await Photos.UploadAsync(file);
+        }
+        catch (PhotoUploadException ex)
+        {
+            (photoError, preview) = (ex.Message, null);
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private async Task ShowPreviewAsync(IBrowserFile file, int attempt)
+    {
+        try
+        {
+            var url = await PhotoService.PreviewAsync(file);
+            if (attempt != attempts || photoError is not null) return;
+            preview = url;
+            StateHasChanged();
+        }
+        catch (Exception ex) when (ex is Microsoft.JSInterop.JSException or NotSupportedException or InvalidOperationException)
+        {
+        }
+    }
+
+    private void RemovePhoto() => (draft!.Photo, preview) = (null, null);
+
+    private void KeepEmptyStep()
+    {
+        if (draft!.Steps[^1].Text.Trim().Length > 0) draft.Steps.Add(new());
+    }
+
+    private void Save()
+    {
+        var id = Id ?? Guid.NewGuid();
+        if (draft!.TryBuild(id, out error, Names.Language) is not { } recipe) return;
+        Recipes.Save(recipe);
+        Nav.NavigateTo($"rezept/{id}");
+    }
+}
