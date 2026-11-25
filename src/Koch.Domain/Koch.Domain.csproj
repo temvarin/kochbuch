@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Pure domain rules and sync logic shared by Koch.App and Koch.Api. No I/O or UI. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Koch.Contracts\Koch.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koch.Domain.Tests" />
+    <InternalsVisibleTo Include="Koch.App.Tests" />
+  </ItemGroup>
+</Project>

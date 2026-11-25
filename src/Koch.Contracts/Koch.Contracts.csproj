@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared HTTP wire shapes and blob path conventions. Zero dependencies. -->
+</Project>

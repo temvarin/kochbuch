@@ -1,0 +1,30 @@
+# Code style, enforced by the build (EnforceCodeStyleInBuild in Directory.Build.props) and applied by `dotnet format`.
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{cs,razor}]
+indent_size = 4
+# A guide for editors; long lines are wrapped by hand.
+max_line_length = 120
+
+[*.cs]
+# Usings: System first, no unused ones.
+dotnet_sort_system_directives_first = true
+dotnet_diagnostic.IDE0005.severity = warning
+
+# One namespace per file, file-scoped.
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_diagnostic.IDE0161.severity = warning
+
+# Accessibility written out, as in the .NET runtime: private, internal, public.
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_diagnostic.IDE0040.severity = warning
+
+# Formatting as `dotnet format` leaves it.
+dotnet_diagnostic.IDE0055.severity = warning

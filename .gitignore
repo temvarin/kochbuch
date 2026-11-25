@@ -1,0 +1,17 @@
+# Build output
+bin/
+obj/
+publish/
+
+# Local secrets and tools
+*.user
+.vs/
+.idea/
+received.json
+
+# Local storage emulator data
+.azurite/
+
+# Decision records and the one-time Azure setup notes stay on the developer's machine, as in the sibling apps
+docs/adr/
+docs/deployment.md
