@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "Koch.Api": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:8092",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ConnectionStrings__Database": "Server=(localdb)\\MSSQLLocalDB;Database=Kassensturz;Integrated Security=true"
+      }
+    }
+  }
+}
