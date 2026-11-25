@@ -1,0 +1,8 @@
+# The workflow's actions are pinned to commit SHAs, so a moved tag can't change what runs with the deploy identity.
+# Dependabot proposes the new SHA when an action releases a new version.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
