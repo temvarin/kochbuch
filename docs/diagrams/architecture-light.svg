@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 760" width="1024" height="760" role="img" aria-labelledby="title desc">
 <title id="title">Architecture of Kochbuch</title>
-<desc id="desc">Shared rules live in one domain library, Koch.Domain, used by the app on the phone and by the API on Azure, so both sides add up amounts, sync and merge the same way. On the phone: Koch.App, a Blazor WebAssembly PWA, keeps recipes and the shopping list in localStorage and works offline; a service worker keeps the app and the photos. On Azure, in Sweden Central: Koch.Gateway, the only public app, signs users in with Easy Auth, serves the app and the photos, and forwards syncs to Koch.Api, an internal app with two modules, recipes and the shopping list. Koch.Api stores its rows in kassensturz's Azure SQL database, in its own two schemas, with its own managed identity. The phone uploads a photo straight to Blob Storage with a write-only link; Event Grid reports the new upload to a Service Bus queue, and Koch.Media, an Azure Function, turns it into WebP renditions without camera metadata or GPS position. Every app sends OpenTelemetry traces to Application Insights, and a budget alarm mails if costs rise. GitHub Actions tests and deploys everything, signed in through OIDC, and smoke-checks the live gateway.</desc>
+<desc id="desc">Shared rules live in one domain library, Koch.Domain, used by the app on the phone and by the API on Azure, so both sides add up amounts, sync and merge the same way. On the phone: Koch.App, a Blazor WebAssembly PWA, keeps recipes and the shopping list in localStorage and works offline; a service worker keeps the app and the photos. On Azure, in Sweden Central: Koch.Gateway, the only public app, signs users in with Easy Auth, serves the app and the photos, and forwards syncs to Koch.Api, an internal app with two modules, recipes and the shopping list. Koch.Api keeps each module as one JSON blob in Blob Storage, documents/recipes.json and documents/shopping.json, written with ETag compare-and-set under its own managed identity; blob versioning keeps earlier versions for 180 days. The phone uploads a photo straight to Blob Storage with a write-only link; Event Grid reports the new upload to a Service Bus queue, and Koch.Media, an Azure Function, turns it into WebP renditions without camera metadata or GPS position. Every app sends OpenTelemetry traces to Application Insights, and a budget alarm mails if costs rise. GitHub Actions tests and deploys everything, signed in through OIDC, and smoke-checks the live gateway.</desc>
 <defs>
 <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#111111"/></marker>
 <style>
@@ -64,17 +64,18 @@
 <text x="565" y="338" class="sub">part by part</text>
 <rect x="805" y="205" width="200" height="234" rx="12" class="shadow"/>
 <rect x="800" y="200" width="200" height="234" rx="12" class="card"/>
-<text x="820" y="234" class="title">Azure SQL</text>
-<text x="820" y="258" class="sub">kassensturz's</text>
-<text x="820" y="278" class="sub">database: two</text>
-<text x="820" y="298" class="sub">schemas, recipes</text>
-<text x="820" y="318" class="sub">and shopping, and</text>
-<text x="820" y="338" class="sub">one managed</text>
-<text x="820" y="358" class="sub">identity</text>
+<text x="820" y="234" class="title">Blob Storage</text>
+<text x="820" y="258" class="sub">documents/: one</text>
+<text x="820" y="278" class="sub">JSON blob each for</text>
+<text x="820" y="298" class="sub">recipes and shopping,</text>
+<text x="820" y="318" class="sub">written with ETag</text>
+<text x="820" y="338" class="sub">compare-and-set,</text>
+<text x="820" y="358" class="sub">180 days of versions</text>
 <rect x="295" y="343" width="200" height="96" rx="12" class="shadow"/>
 <rect x="290" y="338" width="200" height="96" rx="12" class="card"/>
 <text x="310" y="372" class="title">Blob Storage</text>
 <text x="310" y="396" class="sub">uploads/, photos/</text>
+<text x="310" y="416" class="sub">(the same account)</text>
 <rect x="295" y="495" width="200" height="100" rx="12" class="shadow"/>
 <rect x="290" y="490" width="200" height="100" rx="12" class="card"/>
 <text x="310" y="524" class="title">Event Grid</text>
@@ -108,7 +109,7 @@
 <text x="402" y="467" class="label" text-anchor="start">new upload</text>
 <path d="M495 540H537" class="flow" marker-end="url(#arrow)"/>
 <path d="M750 540H792" class="flow" marker-end="url(#arrow)"/>
-<path d="M900 595V622H527V412H498" class="flow" marker-end="url(#arrow)"/>
-<text x="660" y="642" class="label" text-anchor="middle">WebP renditions</text>
+<path d="M900 485V462H518V412H498" class="flow" marker-end="url(#arrow)"/>
+<text x="660" y="455" class="label" text-anchor="middle">WebP renditions</text>
 <path d="M240 686H262" class="flow" marker-end="url(#arrow)"/>
 </svg>

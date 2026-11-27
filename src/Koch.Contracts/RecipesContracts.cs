@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Koch.Contracts;
 
-/// <summary>The answer of <c>/api/recipes/status</c>: proves the gateway → API → SQL path works.</summary>
+/// <summary>The answer of <c>/api/recipes/status</c>: proves the gateway → API → Blob Storage path works.</summary>
 public sealed record RecipesStatus(string User, bool Database);
 
 public sealed record QuantityJson(decimal Value, string Unit);
