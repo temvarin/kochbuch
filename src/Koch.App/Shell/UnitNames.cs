@@ -12,7 +12,7 @@ public enum UnitLanguage
 
 /// <summary>
 /// Units as this phone shows them, in German or in Russian, chosen under Konto and kept on the phone (localStorage key
-/// koch.units). Recipes and lists store a unit as its code (Koch.Kernel.Measures.Units), in no particular language,
+/// koch.units). Recipes and lists store a unit as its code (Koch.Domain.Measures.Units), in no particular language,
 /// so the choice changes nothing that syncs: each phone may show the same recipe in its own words.
 /// </summary>
 public sealed class UnitNames(IKeyValueStore store)

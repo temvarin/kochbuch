@@ -37,7 +37,7 @@ public sealed class EasyAuth(
         return Task.FromResult(SignedIn(id, Request.Headers["X-MS-CLIENT-PRINCIPAL-NAME"].ToString()));
     }
 
-    /// <summary>Easy Auth's setting <c>login.cookieExpiration</c>, counted from the sign-in (infra/modules/gatewayAuth.bicep, sessionLifetime).</summary>
+    /// <summary>Easy Auth's setting <c>login.cookieExpiration</c>, counted from the sign-in (infra/main.bicep, gatewayAuth).</summary>
     public static readonly TimeSpan SessionLifetime = TimeSpan.FromDays(30);
 
     private const string SessionCookie = "AppServiceAuthSession";

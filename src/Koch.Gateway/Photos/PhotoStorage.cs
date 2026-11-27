@@ -21,7 +21,7 @@ public interface IPhotoStorage
 /// <summary>
 /// <see cref="IPhotoStorage"/> in Blob Storage with the gateway's managed identity. Upload links are user delegation SAS:
 /// signed with a key Entra hands the identity, so no account key exists anywhere, and they can't grant more than the
-/// identity has: create in <c>uploads/</c> (infra/modules/photos.bicep).
+/// identity has: create in <c>uploads/</c> (infra/main.bicep).
 /// </summary>
 public sealed class BlobPhotoStorage(BlobServiceClient service, TimeProvider clock) : IPhotoStorage
 {

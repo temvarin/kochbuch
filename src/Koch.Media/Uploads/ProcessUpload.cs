@@ -6,7 +6,7 @@ namespace Koch.Media.Uploads;
 /// <summary>
 /// A photo was uploaded: Event Grid saw BlobCreated in <c>uploads/</c> and put it in the Service Bus queue
 /// <c>photo-uploads</c>. A failure (storage briefly away) throws, so Service Bus delivers it again and, after its
-/// delivery count, moves it to the dead-letter queue, which an alert watches (docs/adr/0006).
+/// delivery count, moves it to the dead-letter queue, where it can be looked at (docs/adr/0006).
 /// </summary>
 public sealed partial class ProcessUpload(PhotoProcessor processor, ILogger<ProcessUpload> logger)
 {
