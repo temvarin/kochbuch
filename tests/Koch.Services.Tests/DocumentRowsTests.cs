@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Azure.Storage.Blobs;
 using Koch.Api.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -79,36 +81,77 @@ public sealed class MemoryDocumentRowsTests : DocumentRowsContract
     protected override Task<int> VersionOfAsync(string id) => Task.FromResult(store.VersionOf(id));
 }
 
-public sealed class SqlDocumentRowsTests : DocumentRowsContract, IAsyncLifetime
+public sealed class FileDocumentRowsTests : DocumentRowsContract, IDisposable
 {
-    private readonly SqlDatabase sql = new();
+    private readonly string path = Path.Combine(Path.GetTempPath(), $"koch-rows-{Guid.NewGuid():N}", "recipes.json");
+    private readonly FileDocumentRows store;
+
+    public FileDocumentRowsTests() => store = new FileDocumentRows(path);
+
+    protected override IDocumentRows Store => store;
+    protected override Task<int> VersionOfAsync(string id) => Task.FromResult(store.VersionOf(id));
+
+    [Fact]
+    public async Task A_failing_request_saves_none_of_its_rows()
+    {
+        await Assert.ThrowsAnyAsync<JsonException>(() =>
+            Store.WriteAndReadAsync([new("recipe:a", """{"x":1}"""), new("recipe:b", "not json")]));
+
+        Assert.Empty(await Store.WriteAndReadAsync([]));
+    }
+
+    public void Dispose()
+    {
+        var dir = Path.GetDirectoryName(path);
+        if (dir is not null && Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+    }
+}
+
+/// <summary>Runs against Azurite when KOCH_TEST_STORAGE is set (e.g. in CI).</summary>
+public sealed class BlobDocumentRowsTests : DocumentRowsContract, IAsyncLifetime
+{
+    private static readonly string? ConnectionString = Environment.GetEnvironmentVariable("KOCH_TEST_STORAGE");
+
+    private BlobContainerClient? container;
+    private BlobDocumentRows? blobStore;
+    private readonly MemoryDocumentRows memory = new();
+
+    protected override IDocumentRows Store => (IDocumentRows?)blobStore ?? memory;
+
+    protected override Task<int> VersionOfAsync(string id) =>
+        blobStore is not null ? blobStore.VersionOfAsync(id) : Task.FromResult(memory.VersionOf(id));
 
     public async Task InitializeAsync()
     {
-        await sql.InitializeAsync();
-        await sql.ExecuteAsync(SqlDatabase.SchemaScript());
+        if (ConnectionString is not { Length: > 0 }) return;
+        container = new BlobServiceClient(ConnectionString).GetBlobContainerClient($"test-{Guid.NewGuid():N}");
+        await container.CreateIfNotExistsAsync();
+        blobStore = new BlobDocumentRows(container, "recipes.json", NullLogger<BlobDocumentRows>.Instance);
     }
 
-    public Task DisposeAsync() => sql.DisposeAsync();
-
-    protected override IDocumentRows Store => new SqlDocumentRows(sql.ConnectionString, "recipes", NullLogger<SqlDocumentRows>.Instance);
-
-    protected override async Task<int> VersionOfAsync(string id) =>
-        (int)(await sql.ExecuteAsync($"SELECT Version FROM recipes.Documents WHERE Id = '{id}'") ?? 0);
+    public async Task DisposeAsync()
+    {
+        if (container is not null) await container.DeleteIfExistsAsync();
+    }
 
     [Fact]
-    public void A_schema_name_is_never_anything_but_letters()
+    public async Task CanRead_checks_whether_the_container_exists()
     {
-        Assert.Throws<ArgumentException>(() =>
-            new SqlDocumentRows(sql.ConnectionString, "recipes; DROP TABLE x", NullLogger<SqlDocumentRows>.Instance));
+        if (blobStore is null || container is null) return;
+        Assert.True(await blobStore.CanReadAsync());
+
+        await container.DeleteIfExistsAsync();
+        Assert.False(await blobStore.CanReadAsync());
     }
 
     [Fact]
     public async Task A_failing_request_saves_none_of_its_rows()
     {
-        await Assert.ThrowsAsync<Microsoft.Data.SqlClient.SqlException>(() =>
-            Store.WriteAndReadAsync([new("recipe:a", """{"x":1}"""), new("recipe:b", "not json")]));
+        if (blobStore is null) return;
 
-        Assert.Equal(0, await sql.ExecuteAsync("SELECT COUNT(*) FROM recipes.Documents"));
+        await Assert.ThrowsAnyAsync<JsonException>(() =>
+            blobStore.WriteAndReadAsync([new("recipe:a", """{"x":1}"""), new("recipe:b", "not json")]));
+
+        Assert.Empty(await blobStore.WriteAndReadAsync([]));
     }
 }

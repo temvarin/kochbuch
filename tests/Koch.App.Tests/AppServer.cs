@@ -58,7 +58,6 @@ public sealed class AppServer : IDisposable
     {
         apiHost = new(() => new WebApplicationFactory<GatewayUser>().WithWebHostBuilder(web =>
         {
-            web.UseSetting("ConnectionStrings:Database", "Server=unused");
             web.ConfigureTestServices(s =>
             {
                 s.AddKeyedSingleton<IDocumentRows>("recipes", RecipeRows);

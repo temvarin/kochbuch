@@ -1,6 +1,9 @@
-using System.Data;
-using System.Text.RegularExpressions;
-using Microsoft.Data.SqlClient;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 
 namespace Koch.Api.Storage;
 
@@ -8,12 +11,19 @@ public sealed record StoredRow(string Id, string Json);
 
 public sealed record RowWrite(string Id, string? Json, Func<string, string>? MergeWith = null);
 
+public sealed record DocumentEntry(string Json, int Version);
+
 public interface IDocumentRows
 {
     Task<bool> CanReadAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<StoredRow>> WriteAndReadAsync(IReadOnlyList<RowWrite> writes, CancellationToken cancellationToken = default);
 }
+
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web,
+    RespectNullableAnnotations = true, RespectRequiredConstructorParameters = true)]
+[JsonSerializable(typeof(Dictionary<string, DocumentEntry>))]
+internal sealed partial class DocumentMapJson : JsonSerializerContext;
 
 public static class DocumentRows
 {
@@ -25,36 +35,46 @@ public static class DocumentRows
         write.Json is null ? Tombstone
         : write.MergeWith is { } merge && Live(before) is { } current ? merge(current)
         : write.Json;
+
+    internal static (Dictionary<string, DocumentEntry> Next, bool Changed) Apply(
+        IReadOnlyDictionary<string, DocumentEntry> current, IReadOnlyList<RowWrite> writes)
+    {
+        var next = new Dictionary<string, DocumentEntry>(current, StringComparer.Ordinal);
+        var changed = false;
+        foreach (var write in writes)
+        {
+            var hasRow = next.TryGetValue(write.Id, out var prev);
+            var json = Target(write, hasRow ? prev!.Json : null);
+            using var _ = JsonDocument.Parse(json);
+            if (hasRow && string.Equals(prev!.Json, json, StringComparison.Ordinal)) continue;
+
+            next[write.Id] = new DocumentEntry(json, hasRow ? prev!.Version + 1 : 1);
+            changed = true;
+        }
+        return (next, changed);
+    }
+
+    internal static IReadOnlyList<StoredRow> LiveRows(IReadOnlyDictionary<string, DocumentEntry> map) =>
+        [.. map.Where(kv => kv.Value.Json != Tombstone)
+            .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv => new StoredRow(kv.Key, kv.Value.Json))];
 }
 
-public sealed partial class SqlDocumentRows : IDocumentRows
+public sealed partial class BlobDocumentRows(BlobContainerClient container, string blobName, ILogger<BlobDocumentRows> logger) : IDocumentRows
 {
-    private readonly string connectionString, lockRow, insert, update, readLive, count;
-    private readonly ILogger<SqlDocumentRows> logger;
-
-    public SqlDocumentRows(string connectionString, string schema, ILogger<SqlDocumentRows> logger)
-    {
-        Sql.CheckSchema(schema);
-        (this.connectionString, this.logger) = (connectionString, logger);
-        lockRow = $"SELECT Json FROM {schema}.Documents WITH (UPDLOCK, HOLDLOCK) WHERE Id = @Id";
-        insert = $"INSERT INTO {schema}.Documents (Id, Json, Version) VALUES (@Id, @Json, 1)";
-        update = $"UPDATE {schema}.Documents SET Json = @Json, Version = Version + 1 WHERE Id = @Id";
-        readLive = $"SELECT Id, Json FROM {schema}.Documents WHERE JSON_VALUE(Json, '$.removed') IS NULL ORDER BY Id";
-        count = $"SELECT COUNT_BIG(*) FROM {schema}.Documents";
-    }
+    private const int MaxAttempts = 5;
+    private static readonly BlobHttpHeaders JsonHeaders = new() { ContentType = "application/json; charset=utf-8" };
 
     public async Task<bool> CanReadAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            await using var connection = await Sql.OpenAsync(connectionString, cancellationToken);
-            await using var command = new SqlCommand(count, connection);
-            await command.ExecuteScalarAsync(cancellationToken);
+            await container.GetPropertiesAsync(cancellationToken: cancellationToken);
             return true;
         }
-        catch (SqlException e)
+        catch (RequestFailedException e)
         {
-            TableUnreadable(logger, e);
+            StoreUnreadable(logger, e);
             return false;
         }
     }
@@ -62,67 +82,94 @@ public sealed partial class SqlDocumentRows : IDocumentRows
     public async Task<IReadOnlyList<StoredRow>> WriteAndReadAsync(
         IReadOnlyList<RowWrite> writes, CancellationToken cancellationToken = default)
     {
-        await using var connection = await Sql.OpenAsync(connectionString, cancellationToken);
-        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
-        foreach (var write in writes)
+        var blob = container.GetBlobClient(blobName);
+        for (var attempt = 0; attempt < MaxAttempts; attempt++)
         {
-            string? before;
-            await using (var read = Command(lockRow, connection, transaction, write.Id))
-                before = await read.ExecuteScalarAsync(cancellationToken) as string;
-            var json = DocumentRows.Target(write, before);
-            if (string.Equals(before, json, StringComparison.Ordinal)) continue;
+            var (current, etag) = await ReadMapAsync(blob, cancellationToken);
+            var (next, changed) = DocumentRows.Apply(current, writes);
+            if (!changed) return DocumentRows.LiveRows(next);
 
-            await using var save = Command(before is null ? insert : update, connection, transaction, write.Id);
-            save.Parameters.Add("@Json", SqlDbType.NVarChar, -1).Value = json;
-            await save.ExecuteNonQueryAsync(cancellationToken);
+            var options = new BlobUploadOptions
+            {
+                HttpHeaders = JsonHeaders,
+                Conditions = etag is null
+                    ? new BlobRequestConditions { IfNoneMatch = ETag.All }
+                    : new BlobRequestConditions { IfMatch = etag.Value },
+            };
+            try
+            {
+                await blob.UploadAsync(BinaryData.FromString(JsonSerializer.Serialize(next, DocumentMapJson.Default.DictionaryStringDocumentEntry)),
+                    options, cancellationToken);
+                return DocumentRows.LiveRows(next);
+            }
+            catch (RequestFailedException e) when (e.Status is 409 or 412)
+            {
+                // Another writer updated the blob concurrently; re-read and retry.
+            }
         }
-
-        List<StoredRow> rows = [];
-        await using (var read = new SqlCommand(readLive, connection, transaction))
-        await using (var reader = await read.ExecuteReaderAsync(cancellationToken))
-        {
-            while (await reader.ReadAsync(cancellationToken)) rows.Add(new StoredRow(reader.GetString(0), reader.GetString(1)));
-        }
-        await transaction.CommitAsync(cancellationToken);
-        return rows;
+        throw new InvalidOperationException($"Concurrent writes to '{blobName}' exceeded {MaxAttempts} attempts.");
     }
 
-    private static SqlCommand Command(string sql, SqlConnection connection, SqlTransaction transaction, string id)
+    internal async Task<int> VersionOfAsync(string id, CancellationToken cancellationToken = default)
     {
-        var command = new SqlCommand(sql, connection, transaction);
-        command.Parameters.Add("@Id", SqlDbType.NVarChar, 200).Value = id;
-        return command;
+        var (current, _) = await ReadMapAsync(container.GetBlobClient(blobName), cancellationToken);
+        return current.TryGetValue(id, out var entry) ? entry.Version : 0;
     }
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "The service's table can't be read.")]
-    private static partial void TableUnreadable(ILogger logger, Exception exception);
-}
-
-internal static partial class Sql
-{
-    private static readonly SqlRetryLogicBaseProvider Retry = SqlConfigurableRetryFactory.CreateFixedRetryProvider(
-        new SqlRetryLogicOption { NumberOfTries = 3, DeltaTime = TimeSpan.FromSeconds(5) });
-
-    public static void CheckSchema(string schema)
+    private static async Task<(Dictionary<string, DocumentEntry> Map, ETag? ETag)> ReadMapAsync(
+        BlobClient blob, CancellationToken cancellationToken)
     {
-        if (!SchemaName().IsMatch(schema)) throw new ArgumentException($"Not a schema name: '{schema}'.");
-    }
-
-    public static async Task<SqlConnection> OpenAsync(string connectionString, CancellationToken cancellationToken)
-    {
-        var connection = new SqlConnection(connectionString) { RetryLogicProvider = Retry };
         try
         {
-            await connection.OpenAsync(cancellationToken);
-            return connection;
+            var result = await blob.DownloadContentAsync(cancellationToken);
+            var map = JsonSerializer.Deserialize(result.Value.Content.ToString(), DocumentMapJson.Default.DictionaryStringDocumentEntry)
+                ?? throw new JsonException($"Stored blob '{blob.Name}' deserialized to null.");
+            return (new Dictionary<string, DocumentEntry>(map, StringComparer.Ordinal), result.Value.Details.ETag);
         }
-        catch
+        catch (RequestFailedException e) when (e.Status == 404)
         {
-            await connection.DisposeAsync();
-            throw;
+            return ([], null);
         }
     }
 
-    [GeneratedRegex("^[a-z]+$")]
-    private static partial Regex SchemaName();
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The service's blob container can't be read.")]
+    private static partial void StoreUnreadable(ILogger logger, Exception exception);
+}
+
+public sealed class FileDocumentRows(string filePath) : IDocumentRows
+{
+    private readonly Lock gate = new();
+
+    public Task<bool> CanReadAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+    public Task<IReadOnlyList<StoredRow>> WriteAndReadAsync(
+        IReadOnlyList<RowWrite> writes, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var current = ReadMap();
+            var (next, changed) = DocumentRows.Apply(current, writes);
+            if (changed)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+                var temp = $"{filePath}.{Guid.NewGuid():N}.tmp";
+                File.WriteAllText(temp, JsonSerializer.Serialize(next, DocumentMapJson.Default.DictionaryStringDocumentEntry), Encoding.UTF8);
+                File.Move(temp, filePath, overwrite: true);
+            }
+            return Task.FromResult(DocumentRows.LiveRows(next));
+        }
+    }
+
+    internal int VersionOf(string id)
+    {
+        lock (gate) return ReadMap().TryGetValue(id, out var entry) ? entry.Version : 0;
+    }
+
+    private Dictionary<string, DocumentEntry> ReadMap()
+    {
+        if (!File.Exists(filePath)) return new(StringComparer.Ordinal);
+        var map = JsonSerializer.Deserialize(File.ReadAllText(filePath, Encoding.UTF8), DocumentMapJson.Default.DictionaryStringDocumentEntry)
+            ?? throw new JsonException($"Stored file '{filePath}' deserialized to null.");
+        return new(map, StringComparer.Ordinal);
+    }
 }

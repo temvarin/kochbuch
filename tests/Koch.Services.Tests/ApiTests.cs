@@ -28,7 +28,6 @@ public sealed class ApiTests(WebApplicationFactory<GatewayUser> factory) : IClas
 
     private HttpClient Service(bool? overrideReadable = null) => factory.WithWebHostBuilder(host =>
     {
-        host.UseSetting("ConnectionStrings:Database", "Server=unused");
         host.ConfigureTestServices(services =>
         {
             services.AddKeyedSingleton<IDocumentRows>("recipes", overrideReadable is { } r ? new FakeDatabase(r) : recipeStore);

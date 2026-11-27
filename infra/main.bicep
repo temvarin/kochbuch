@@ -1,4 +1,4 @@
-// Kochbuch on Azure (Consumption / Flex Consumption, scale-to-zero, ~$0.02-0.05/month excl. shared SQL).
+// Kochbuch on Azure (Consumption / Flex Consumption, scale-to-zero, ~$0.02-0.05/month, zero SQL database).
 // Deploy: az deployment group create -g rg-kochbuch -f infra/main.bicep -p infra/main.bicepparam
 
 targetScope = 'resourceGroup'
@@ -24,12 +24,6 @@ param tenantId string = tenant().tenantId
 @description('Client ID of the Entra app registration for sign-in.')
 param signInClientId string
 
-@description('Name of the existing Azure SQL logical server (without domain).')
-param sqlServerName string
-
-@description('Name of the existing Azure SQL database hosting the recipes and shopping schemas.')
-param sqlDatabaseName string
-
 @description('Monthly budget in the billing currency; mails at 50% and 100%.')
 param budgetAmount int = 3
 
@@ -42,7 +36,6 @@ param budgetContactEmails array
 var suffix = take(uniqueString(resourceGroup().id), 6)
 var storageName = take('st${replace(namePrefix, '-', '')}${uniqueString(resourceGroup().id)}', 24)
 var blobEndpoint = 'https://${storageName}.blob.${az.environment().suffixes.storage}/'
-var sqlServer = 'tcp:${sqlServerName}${az.environment().suffixes.sqlServerHostname},1433'
 
 var roles = {
   blobDataOwner: 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
@@ -157,10 +150,8 @@ resource apiApp 'Microsoft.App/containerApps@2025-01-01' = {
           image: '${registry}/${namePrefix}-api:${imageTag}'
           resources: { cpu: json('0.25'), memory: '0.5Gi' }
           env: [
-            {
-              name: 'ConnectionStrings__Database'
-              value: 'Server=${sqlServer};Database=${sqlDatabaseName};Authentication=Active Directory Managed Identity;User Id=${apiIdentity.properties.clientId};Encrypt=True'
-            }
+            { name: 'Storage__BlobServiceUri', value: blobEndpoint }
+            { name: 'AZURE_CLIENT_ID', value: apiIdentity.properties.clientId }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: insights.properties.ConnectionString }
           ]
           probes: [
@@ -274,6 +265,7 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01'
   parent: storage
   name: 'default'
   properties: {
+    isVersioningEnabled: true
     cors: {
       corsRules: [
         {
@@ -288,7 +280,7 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01'
   }
 }
 
-var containerNames = ['uploads', 'photos', 'deployments', 'deadletter']
+var containerNames = ['uploads', 'photos', 'deployments', 'deadletter', 'documents']
 
 resource containers 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = [for name in containerNames: {
   parent: blobService
@@ -318,9 +310,31 @@ resource blobLifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@202
             actions: { baseBlob: { delete: { daysAfterCreationGreaterThan: 30 } } }
           }
         }
+        {
+          name: 'expire-old-document-versions'
+          type: 'Lifecycle'
+          definition: {
+            filters: { blobTypes: ['blockBlob'], prefixMatch: ['documents/'] }
+            actions: { version: { delete: { daysAfterCreationGreaterThan: 180 } } }
+          }
+        }
+        {
+          name: 'expire-temp-versions'
+          type: 'Lifecycle'
+          definition: {
+            filters: { blobTypes: ['blockBlob'], prefixMatch: ['uploads/', 'deadletter/', 'deployments/'] }
+            actions: { version: { delete: { daysAfterCreationGreaterThan: 7 } } }
+          }
+        }
       ]
     }
   }
+}
+
+resource apiDocuments 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: containers[4]
+  name: guid(containers[4].id, apiIdentity.id, roles.blobDataContributor)
+  properties: { principalId: apiIdentity.properties.principalId, principalType: 'ServicePrincipal', roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.blobDataContributor) }
 }
 
 resource gatewayDelegator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {

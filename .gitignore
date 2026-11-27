@@ -9,8 +9,9 @@ publish/
 .idea/
 received.json
 
-# Local storage emulator data
+# Local storage emulator & dev data
 .azurite/
+.dev-data/
 
 # Decision records and the one-time Azure setup notes stay on the developer's machine, as in the sibling apps
 docs/adr/

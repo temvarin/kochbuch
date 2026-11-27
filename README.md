@@ -23,7 +23,7 @@ Our recipes lived in screenshots, browser bookmarks and a paper folder, and the 
 
 The second reason is learning microservice deployment on Azure for almost nothing (~$0.02–$0.05/month on an Azure for Students account): three focused deployables, each with a real architectural boundary:
 1. **Koch.Gateway** (Container App, external): edge/BFF, Entra Easy Auth, serves the PWA and photos, proxies `/api/*`.
-2. **Koch.Api** (Container App, internal): synchronous transactional backend owning Recipes and Shopping in separate SQL schemas.
+2. **Koch.Api** (Container App, internal): synchronous transactional backend owning Recipes and Shopping sync over Azure Blob Storage (`documents/recipes.json` & `documents/shopping.json` with ETag CAS and 180-day Blob Versioning).
 3. **Koch.Media** (Azure Functions, Flex Consumption): asynchronous event-driven image processor (`Blob Storage → Event Grid → Service Bus → Function`) that strips EXIF/GPS and writes WebP renditions.
 
 ## Features
@@ -48,7 +48,7 @@ One .NET 10 solution with 6 `src/` projects, 1 dev tool, and 4 test projects:
 src/
   Koch.App/         Blazor WebAssembly PWA: Recipes/, Shopping/, Sync/, Account/, Shell/
   Koch.Gateway/     Public Container App: Easy Auth, YARP proxy, security headers, photo SAS & serving
-  Koch.Api/         Internal Container App: Recipes & Shopping sync endpoints + Azure SQL row store
+  Koch.Api/         Internal Container App: Recipes & Shopping sync endpoints over Blob Storage (ETag CAS)
   Koch.Media/       Azure Function (Flex Consumption): Event Grid -> Service Bus -> WebP renditions
   Koch.Domain/      Shared pure rules: Kernel/, Measures/, Recipes/, Shopping/ (no UI, no I/O)
   Koch.Contracts/   Shared wire DTOs & PhotoPaths (zero dependencies)
@@ -56,40 +56,36 @@ tools/
   Koch.DevPhotos/   Local dev only: watches Azurite uploads/ and runs PhotoProcessor
 tests/
   Koch.Domain.Tests/    Domain rules, 3-way merge, randomized multi-phone sync, shopping amounts
-  Koch.Services.Tests/  Gateway auth/proxy/photos, API sync endpoints, SQL & memory document store
+  Koch.Services.Tests/  Gateway auth/proxy/photos, API sync endpoints, Blob/file/memory document store
   Koch.Media.Tests/     EXIF/GPS stripping, orientation, bomb/size limits, PhotoProcessor, BlobCreated
   Koch.App.Tests/       bUnit page tests against in-memory Koch.Api
 infra/
   main.bicep        Single-file Azure IaC (Container Apps, Easy Auth, Storage, Event Grid, Service Bus, Functions, Budget)
-db/
-  schema.sql        Idempotent SQL tables (recipes.Documents, shopping.Documents with temporal history)
-  manual/grants.sql Least-privilege managed identity grants (run once by hand)
 ```
 
-- **Zero secrets:** Easy Auth uses a federated managed identity; SQL, Blob Storage, and Service Bus use managed identities; GitHub Actions deploys via OIDC and pulls public GHCR images.
-- **Shared database, isolated schemas:** `Koch.Api` uses Kassensturz's Azure SQL Basic database via `recipes` and `shopping` schemas.
+- **Zero secrets:** Easy Auth uses a federated managed identity; Blob Storage and Service Bus use managed identities (`allowSharedKeyAccess: false`); GitHub Actions deploys via OIDC and pulls public GHCR images.
+- **Zero database server:** `Koch.Api` stores `recipes.json` and `shopping.json` in Azure Blob Storage (`documents` container) with HTTP ETag compare-and-set concurrency and 180-day Blob Versioning.
 - **Strict build:** .NET 10, `AnalysisLevel=latest-recommended`, warnings as errors, source-generated JSON.
 
 ## Development
 
-Requires the .NET 10 SDK (`global.json`), SQL Server LocalDB, and Node.js for Azurite (photos).
+Requires the .NET 10 SDK (`global.json`), and Node.js for Azurite if testing photos.
 
-1. Apply `db/schema.sql` once to your local `Kassensturz` database (e.g. via `sqlcmd` or SSMS/Azure Data Studio).
-2. Run the API and the gateway, then open `http://localhost:8091` (in Development the gateway signs requests in as `dev`):
+1. Run the API and the gateway, then open `http://localhost:8091` (in Development the gateway signs requests in as `dev`, and `Koch.Api` stores data locally in `.dev-data/`):
    ```powershell
    dotnet run --project src/Koch.Api          # http://localhost:8092
    dotnet run --project src/Koch.Gateway      # http://localhost:8091
    ```
-3. For photos, start Azurite and the local photo processor:
+2. For photos, start Azurite and the local photo processor:
    ```powershell
    npx -y azurite@3 --location .azurite --skipApiVersionCheck
    dotnet run --project tools/Koch.DevPhotos
    ```
-4. Tests (SQL tests use LocalDB or `KOCH_TEST_SQL`):
+3. Tests (set `KOCH_TEST_STORAGE=UseDevelopmentStorage=true` to also run `BlobDocumentRowsTests` against Azurite):
    ```powershell
    dotnet test -c Release
    ```
-5. Infrastructure check:
+4. Infrastructure check:
    ```powershell
    az bicep build --file infra/main.bicep --stdout > $null; az bicep lint --file infra/main.bicep
    ```
@@ -97,14 +93,14 @@ Requires the .NET 10 SDK (`global.json`), SQL Server LocalDB, and Node.js for Az
 ## Deployment
 
 Every push to `main` runs `.github/workflows/ci.yml`:
-1. **Test:** builds and runs all 4 test projects (with a SQL Server 2022 container) and lints `infra/main.bicep`.
+1. **Test:** builds and runs all 4 test projects (with an Azurite container) and lints `infra/main.bicep`.
 2. **Deploy:**
    - Builds and pushes `kochbuch-gateway` and `kochbuch-api` container images to GHCR (`dotnet publish -t:PublishContainer`).
    - Deploys `infra/main.bicep` (Container Apps `Single` revision mode with `/healthz` Startup probes).
    - Publishes and deploys `Koch.Media` to Azure Functions Flex Consumption.
    - Smoke-checks `/healthz`, `/`, and `401` gates on `/api/whoami`, `/api/recipes/status`, and `/api/shopping/sync`.
 
-**Cost (~$0.02–$0.05/month excl. Kassensturz SQL):** Container Apps and Flex Consumption Functions scale to zero inside free grants; Service Bus Basic (`photo-uploads`), Event Grid, Blob Storage (LRS), and Log Analytics (0.1 GB/day cap) cost pennies; a `$3` Azure Budget alarm guards against surprises.
+**Cost (~$0.02–$0.05/month total):** Container Apps and Flex Consumption Functions scale to zero inside free grants; Service Bus Basic (`photo-uploads`), Event Grid, Blob Storage (LRS + 180-day version lifecycle), and Log Analytics (0.1 GB/day cap) cost pennies; a `$3` Azure Budget alarm guards against surprises.
 
 ## Sources
 

@@ -22,17 +22,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
-      sql:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: Y
-          MSSQL_SA_PASSWORD: Test-only-container-1
-        ports: ['1433:1433']
-        options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Test-only-container-1 -Q 'SELECT 1'"
-          --health-interval 10s --health-retries 12
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports: ['10000:10000']
     env:
-      KOCH_TEST_SQL: Server=localhost;User ID=sa;Password=Test-only-container-1
+      KOCH_TEST_STORAGE: UseDevelopmentStorage=true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -54,8 +48,6 @@ jobs:
     env:
       KOCH_MEMBERS: ${{ secrets.KOCH_MEMBERS }}
       KOCH_SIGNIN_CLIENT_ID: ${{ vars.KOCH_SIGNIN_CLIENT_ID }}
-      KOCH_SQL_SERVER: ${{ vars.KOCH_SQL_SERVER }}
-      KOCH_SQL_DATABASE: ${{ vars.KOCH_SQL_DATABASE }}
       KOCH_BUDGET_START: ${{ vars.KOCH_BUDGET_START }}
       KOCH_BUDGET_EMAILS: ${{ secrets.KOCH_BUDGET_EMAILS }}
     steps:

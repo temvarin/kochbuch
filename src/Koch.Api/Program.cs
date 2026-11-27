@@ -1,4 +1,6 @@
+using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
+using Azure.Storage.Blobs;
 using Koch.Api;
 using Koch.Api.Storage;
 using Koch.Contracts;
@@ -19,14 +21,21 @@ if (builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"] is { Length: 
 builder.Services.AddGatewayUser();
 builder.Services.AddHealthChecks();
 
-string ConnectionString(IServiceProvider sp) =>
-    sp.GetRequiredService<IConfiguration>().GetConnectionString("Database")
-        ?? throw new InvalidOperationException("The connection string Database is missing.");
+IDocumentRows CreateStore(IServiceProvider sp, string name)
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var logger = sp.GetRequiredService<ILogger<BlobDocumentRows>>();
+    if (config["Storage:BlobServiceUri"] is { Length: > 0 } uri)
+        return new BlobDocumentRows(new BlobServiceClient(new Uri(uri), new DefaultAzureCredential()).GetBlobContainerClient("documents"), $"{name}.json", logger);
+    if (config["Storage:ConnectionString"] is { Length: > 0 } cs)
+        return new BlobDocumentRows(new BlobServiceClient(cs).GetBlobContainerClient("documents"), $"{name}.json", logger);
+    if (builder.Environment.IsDevelopment())
+        return new FileDocumentRows(Path.Combine(builder.Environment.ContentRootPath, ".dev-data", $"{name}.json"));
+    throw new InvalidOperationException("The configuration value Storage:BlobServiceUri is missing.");
+}
 
-builder.Services.AddKeyedSingleton<IDocumentRows>("recipes", (sp, _) =>
-    new SqlDocumentRows(ConnectionString(sp), "recipes", sp.GetRequiredService<ILogger<SqlDocumentRows>>()));
-builder.Services.AddKeyedSingleton<IDocumentRows>("shopping", (sp, _) =>
-    new SqlDocumentRows(ConnectionString(sp), "shopping", sp.GetRequiredService<ILogger<SqlDocumentRows>>()));
+builder.Services.AddKeyedSingleton("recipes", (sp, _) => CreateStore(sp, "recipes"));
+builder.Services.AddKeyedSingleton("shopping", (sp, _) => CreateStore(sp, "shopping"));
 
 var app = builder.Build();
 
